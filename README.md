@@ -20,14 +20,6 @@ contracts and service repos are still stabilizing.
 - `src/error-mapping.js`: safe error category/code to user-message mapping.
 - `test/*.test.js`: contract-oriented unit tests using only Node built-ins.
 
-## Local Checks
-
-```sh
-node --test
-```
-
-No install step is required.
-
 ## Future Amplify and Framework Migration
 
 The architecture recommends AWS Amplify Hosting for the frontend and a future
@@ -47,3 +39,21 @@ The browser must never receive provider API keys from the backend or call model
 providers directly. Provider credentials are user-entered, posted to backend
 services, KMS-encrypted as short-lived session secrets, and represented in the UI
 only by safe status metadata.
+
+## Testing And Coverage
+
+Run the unit tests with either command:
+
+```sh
+node --test
+npm test
+```
+
+View the built-in coverage report in the terminal:
+
+```sh
+node --experimental-test-coverage --test
+npm run coverage
+```
+
+The coverage command uses Node's built-in test runner and prints a text report. If later tooling writes HTML, LCOV, TAP, JUnit, or build output, those generated paths are ignored by `.gitignore`.
