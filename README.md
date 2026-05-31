@@ -1,39 +1,43 @@
 # ai-assist-web
 
-Static, dependency-light frontend bootstrap for the AI Assist Platform.
+TypeScript React frontend for the AI Assist Platform.
 
-This repo currently provides a framework-ready browser shell plus pure UI/state
-helpers tested with `node:test`. It does not create a React or Next.js app yet.
-That keeps the first slice reviewable and avoids network installs while the
-contracts and service repos are still stabilizing.
+This repo uses React plus Vite for the browser shell and keeps the core
+onboarding, context-mode, provider-status, session-event, proposed-action, and
+safe-error behavior in pure TypeScript helpers with unit tests.
 
 ## Current Contents
 
-- `index.html`: minimal static shell that can be opened directly from disk.
-- `src/onboarding-state.js`: onboarding step derivation for auth, Google,
+- `index.html`: Vite HTML entrypoint.
+- `src/main.tsx`: React root renderer.
+- `src/App.tsx`: MVP shell using the tested state helpers.
+- `src/onboarding-state.ts`: onboarding step derivation for auth, Google,
   provider setup, and resource session readiness.
-- `src/context-modes.js`: context mode labels and availability state.
-- `src/provider-setup.js`: provider credential setup state for OpenAI,
+- `src/context-modes.ts`: context mode labels and availability state.
+- `src/provider-setup.ts`: provider credential setup state for OpenAI,
   Anthropic, and future Bedrock mode.
-- `src/session-events.js`: reducer for SSE-style session events.
-- `src/proposed-actions.js`: user-facing proposed-action state helpers.
-- `src/error-mapping.js`: safe error category/code to user-message mapping.
-- `test/*.test.js`: contract-oriented unit tests using only Node built-ins.
+- `src/session-events.ts`: reducer for SSE-style session events.
+- `src/proposed-actions.ts`: user-facing proposed-action state helpers.
+- `src/error-mapping.ts`: safe error category/code to user-message mapping.
+- `test/*.test.ts`: contract-oriented unit tests using Vitest.
 
-## Future Amplify and Framework Migration
+## Framework Choice
 
-The architecture recommends AWS Amplify Hosting for the frontend and a future
-React or Next.js implementation. This bootstrap is structured so those steps can
-reuse the tested helpers:
+REPO-002 migrated the temporary static ESM bootstrap to React plus Vite.
+Next.js is not justified for this slice because the current product surface is a
+standalone authenticated app shell without server rendering, file-based routing,
+or backend-for-frontend requirements. Vite keeps the local workflow small and
+matches the intended Amplify static hosting path.
 
-1. Keep `src/*` helpers pure and move them into framework state/hooks as the UI
-   grows.
+## Future Amplify And Backend Wiring
+
+1. Keep `src/*` helpers pure and reuse them from framework state/hooks as the UI grows.
 2. Add generated or packaged schemas from `ai-assist-contracts` before wiring
    real HTTP and SSE clients.
 3. Introduce Amplify hosting config in `ai-assist-infra`; keep frontend secrets
    out of build-time and runtime browser config.
-4. Replace the static shell with React/Next routes for onboarding, provider
-   setup, resource selection, session chat, and action review.
+4. Add authenticated routes/views for onboarding, provider setup, resource
+   selection, session chat, and action review.
 
 The browser must never receive provider API keys from the backend or call model
 providers directly. Provider credentials are user-entered, posted to backend
@@ -46,18 +50,36 @@ Implementation tasks are tracked in [TASKS.md](TASKS.md). Update the checkboxes 
 
 ## Testing And Coverage
 
-Run the unit tests with either command:
+Use Node `^20.19.0 || >=22.12.0`; this matches the locked Vite toolchain.
+
+Install dependencies with repo-local npm:
 
 ```sh
-node --test
+npm install
+```
+
+Run the unit tests:
+
+```sh
 npm test
 ```
 
-View the built-in coverage report in the terminal:
+Run the production build:
 
 ```sh
-node --experimental-test-coverage --test
+npm run build
+```
+
+Run the local dev server:
+
+```sh
+npm run dev
+```
+
+View the coverage report in the terminal:
+
+```sh
 npm run coverage
 ```
 
-The coverage command uses Node's built-in test runner and prints a text report. If later tooling writes HTML, LCOV, TAP, JUnit, or build output, those generated paths are ignored by `.gitignore`.
+Coverage, dependency, and build output paths are ignored by `.gitignore`.

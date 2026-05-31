@@ -13,12 +13,16 @@
 - Keep future modes disabled unless backend support and consent flows exist.
 - All write-back UI must go through proposed-action approval/apply flows; never direct mutation.
 - Add tests for state reducers, context labels, provider status, safe error mapping, event deduplication, and proposed-action status transitions.
+- Use the React plus Vite TypeScript stack unless the parent/user explicitly approves a different frontend framework.
 
 ## Commands
 
-- Run tests with `node --test`.
-- The current static shell can be opened directly from `index.html`.
-- `npm` may not be available in this environment; prefer the direct Node command.
+- Use Node `^20.19.0 || >=22.12.0`.
+- Install dependencies with `npm install`.
+- Run tests with `npm test`.
+- Run coverage with `npm run coverage`.
+- Run production build checks with `npm run build`.
+- Run the local frontend with `npm run dev`.
 
 ## Review Notes
 

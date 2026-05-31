@@ -4,18 +4,39 @@ export const MODEL_PROVIDERS = Object.freeze({
   BEDROCK: "BEDROCK"
 });
 
-export const PROVIDER_LABELS = Object.freeze({
+export type ModelProvider = (typeof MODEL_PROVIDERS)[keyof typeof MODEL_PROVIDERS];
+
+export const PROVIDER_LABELS: Readonly<Record<ModelProvider, string>> = Object.freeze({
   [MODEL_PROVIDERS.OPENAI]: "OpenAI",
   [MODEL_PROVIDERS.ANTHROPIC]: "Anthropic",
   [MODEL_PROVIDERS.BEDROCK]: "Amazon Bedrock"
 });
 
+export type ProviderSetupInput = {
+  provider?: string;
+  validationStatus?: string;
+  fingerprint?: string;
+  expiresAt?: string;
+  isValidating?: boolean;
+  bedrockEnabled?: boolean;
+};
+
+export type ProviderSetupStatus = {
+  provider?: string;
+  label: string;
+  state: "UNAVAILABLE" | "VALIDATING" | "READY" | "EXPIRED" | "INVALID" | "MISSING";
+  message: string;
+  canSubmitKey: boolean;
+  fingerprint?: string | null;
+  expiresAt?: string | null;
+};
+
 const READY_VALIDATION_STATES = new Set(["VALID", "VALIDATED"]);
 const INVALID_VALIDATION_STATES = new Set(["INVALID", "REVOKED"]);
 const EXPIRED_VALIDATION_STATES = new Set(["EXPIRED"]);
 
-export function getProviderLabel(provider) {
-  return PROVIDER_LABELS[provider] ?? "Unknown provider";
+export function getProviderLabel(provider: string): string {
+  return isModelProvider(provider) ? PROVIDER_LABELS[provider] : "Unknown provider";
 }
 
 export function getProviderSetupStatus({
@@ -25,8 +46,8 @@ export function getProviderSetupStatus({
   expiresAt,
   isValidating = false,
   bedrockEnabled = false
-} = {}) {
-  if (!PROVIDER_LABELS[provider]) {
+}: ProviderSetupInput = {}): ProviderSetupStatus {
+  if (!provider || !isModelProvider(provider)) {
     return {
       provider,
       label: "Unknown provider",
@@ -95,4 +116,8 @@ export function getProviderSetupStatus({
     message: `Enter a ${PROVIDER_LABELS[provider]} key to continue.`,
     canSubmitKey: true
   };
+}
+
+function isModelProvider(provider: string): provider is ModelProvider {
+  return Object.hasOwn(PROVIDER_LABELS, provider);
 }

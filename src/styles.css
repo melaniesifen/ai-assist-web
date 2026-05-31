@@ -33,11 +33,23 @@ button {
   font: inherit;
 }
 
+button:disabled {
+  color: var(--muted);
+  cursor: not-allowed;
+  background: var(--surface-muted);
+}
+
 button.primary,
 button.selected {
   border-color: var(--accent);
   color: #ffffff;
   background: var(--accent);
+}
+
+button.primary:disabled {
+  border-color: var(--line);
+  color: var(--muted);
+  background: var(--surface-muted);
 }
 
 .shell {
@@ -130,7 +142,7 @@ h2 {
   color: var(--muted);
 }
 
-.steps .done {
+.steps .complete {
   color: var(--accent-dark);
   font-weight: 700;
 }
@@ -156,10 +168,43 @@ h2 {
   line-height: 1.55;
 }
 
+.status-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 18px 0 0;
+}
+
+.status-grid div {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+  background: var(--surface-muted);
+}
+
+.status-grid dt {
+  margin-bottom: 4px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.status-grid dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-weight: 700;
+}
+
 .action-card {
   align-items: center;
   justify-content: space-between;
   margin-top: 16px;
+}
+
+.action-status {
+  margin: 6px 0 0;
+  color: var(--muted);
 }
 
 .actions {
@@ -177,5 +222,9 @@ h2 {
 
   .panel {
     flex-basis: auto;
+  }
+
+  .status-grid {
+    grid-template-columns: 1fr;
   }
 }

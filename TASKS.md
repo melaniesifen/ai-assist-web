@@ -20,6 +20,8 @@ Relevant design sources: frontend, provider-key, command, SSE, context, proposed
 ## Architecture Tasks
 
 - [ ] REPO-001: Decide final frontend language, runtime, framework, package manager, and package/module layout; compare the static ESM bootstrap with React or Next.js on Amplify Hosting.
+- [x] REPO-002: Migrate this repo from the temporary static ESM bootstrap to a TypeScript frontend stack, likely React plus Vite unless Next.js is later justified, preserving or intentionally superseding current onboarding, context-mode, provider-status, session-event, proposed-action, safe-error, and test coverage behavior.
+- Migration gate: Do not continue broad new frontend feature work until the TypeScript frontend migration is completed or explicitly deferred; REPO-001 remains open for framework, package manager, and package/module layout decisions.
 - [ ] AUTH-002: Add authenticated product-session UI flows for login, logout, session status, token expiry, refresh, and distinct unauthorized/expired/malformed credential states.
 - [ ] AUTH-003: Add Google OAuth connect, callback result, status, reconnect-required, and disconnect UI without exposing OAuth tokens.
 - [ ] AUTH-005: Add provider-key entry and validation UI that sends keys only to backend HTTPS APIs, displays metadata/fingerprint only, and handles validation rate limits safely.

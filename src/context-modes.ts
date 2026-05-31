@@ -6,7 +6,24 @@ export const CONTEXT_MODE_IDS = Object.freeze({
   SCREEN: "SCREEN"
 });
 
-export const CONTEXT_MODE_DEFINITIONS = Object.freeze({
+export type ContextModeId = (typeof CONTEXT_MODE_IDS)[keyof typeof CONTEXT_MODE_IDS];
+
+type ContextModeDefinition = {
+  label: string;
+  description: string;
+  mvpSupported: boolean;
+  requiresGrant: boolean;
+};
+
+export type ContextModeOption = {
+  mode: ContextModeId;
+  label: string;
+  description: string;
+  enabled: boolean;
+  disabledReason: string | null;
+};
+
+export const CONTEXT_MODE_DEFINITIONS: Readonly<Record<ContextModeId, ContextModeDefinition>> = Object.freeze({
   [CONTEXT_MODE_IDS.SELECTION]: {
     label: "Selection",
     description: "Use only the text or range the user explicitly selected.",
@@ -39,11 +56,19 @@ export const CONTEXT_MODE_DEFINITIONS = Object.freeze({
   }
 });
 
-export function getContextModeLabel(mode) {
-  return CONTEXT_MODE_DEFINITIONS[mode]?.label ?? "Unknown context";
+type ContextModeOptionInput = {
+  activeResourceConnected?: boolean;
+  consentedModes?: readonly ContextModeId[];
+};
+
+export function getContextModeLabel(mode: string): string {
+  return CONTEXT_MODE_DEFINITIONS[mode as ContextModeId]?.label ?? "Unknown context";
 }
 
-export function getContextModeOptions({ activeResourceConnected = false, consentedModes = [] } = {}) {
+export function getContextModeOptions({
+  activeResourceConnected = false,
+  consentedModes = []
+}: ContextModeOptionInput = {}): ContextModeOption[] {
   const grantSet = new Set(consentedModes);
 
   return Object.values(CONTEXT_MODE_IDS).map((mode) => {

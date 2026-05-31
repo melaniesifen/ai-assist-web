@@ -1,5 +1,5 @@
-import { mapUserFacingError } from "./error-mapping.js";
-import { PROPOSED_ACTION_STATUSES } from "./proposed-actions.js";
+import { mapUserFacingError, type UserFacingError } from "./error-mapping";
+import { PROPOSED_ACTION_STATUSES, type ProposedActionStatus } from "./proposed-actions";
 
 export const SESSION_EVENT_TYPES = Object.freeze({
   PROGRESS: "progress",
@@ -12,15 +12,79 @@ export const SESSION_EVENT_TYPES = Object.freeze({
   DISCONNECTED: "transport.disconnected"
 });
 
+export type SessionEventType = (typeof SESSION_EVENT_TYPES)[keyof typeof SESSION_EVENT_TYPES];
+
+export type SessionMessage = {
+  messageId: string;
+  role: "assistant";
+  content: string;
+  status: "STREAMING" | "FINAL";
+};
+
+export type ProgressEventView = {
+  eventId: string | null;
+  message: string;
+  createdAt: string | null;
+};
+
+export type ProposedActionView = {
+  actionId: string;
+  actionType?: string | null;
+  resourceId?: string | null;
+  resourceTitle?: string | null;
+  preview?: string | null;
+  createdAt?: string | null;
+  expiresAt?: string | null;
+  updatedAt?: string | null;
+  status: ProposedActionStatus;
+};
+
+export type SessionState = {
+  connection: "CONNECTED" | "DISCONNECTED";
+  messages: SessionMessage[];
+  progress: ProgressEventView[];
+  proposedActions: Record<string, ProposedActionView>;
+  errors: UserFacingError[];
+  processedEventIds: string[];
+};
+
+type SessionEvent = {
+  eventId?: string;
+  type?: string;
+  message?: string;
+  messageId?: string;
+  delta?: string;
+  content?: string;
+  action?: UnsafeProposedAction;
+  actionId?: string;
+  status?: string;
+  error?: {
+    category?: string;
+    code?: string;
+  };
+  createdAt?: string;
+};
+
+type UnsafeProposedAction = {
+  actionId?: string;
+  actionType?: string;
+  resourceId?: string;
+  resourceTitle?: string;
+  preview?: string;
+  createdAt?: string;
+  expiresAt?: string;
+  status?: string;
+};
+
 export const MAX_PROCESSED_EVENT_IDS = 500;
 
-const ACTION_STATUS_VALUES = new Set(Object.values(PROPOSED_ACTION_STATUSES));
+const ACTION_STATUS_VALUES = new Set<string>(Object.values(PROPOSED_ACTION_STATUSES));
 const INVALID_SESSION_EVENT_ERROR = Object.freeze({
   category: "VALIDATION",
   code: "INVALID_SESSION_EVENT"
 });
 
-export function createInitialSessionState() {
+export function createInitialSessionState(): SessionState {
   return {
     connection: "DISCONNECTED",
     messages: [],
@@ -31,7 +95,7 @@ export function createInitialSessionState() {
   };
 }
 
-export function reduceSessionEvent(state, event) {
+export function reduceSessionEvent(state: SessionState | undefined, event: SessionEvent | null | undefined): SessionState {
   const current = state ?? createInitialSessionState();
   if (!event || typeof event.type !== "string") {
     return current;
@@ -42,7 +106,7 @@ export function reduceSessionEvent(state, event) {
     return current;
   }
 
-  const next = {
+  const next: SessionState = {
     ...current,
     messages: [...current.messages],
     progress: [...current.progress],
@@ -77,10 +141,10 @@ export function reduceSessionEvent(state, event) {
       }
       break;
     case SESSION_EVENT_TYPES.ACTION_STATUS:
-      if (event.actionId && ACTION_STATUS_VALUES.has(event.status)) {
+      if (event.actionId && ACTION_STATUS_VALUES.has(event.status ?? "")) {
         next.proposedActions[event.actionId] = {
           ...(next.proposedActions[event.actionId] ?? { actionId: event.actionId }),
-          status: event.status,
+          status: event.status as ProposedActionStatus,
           updatedAt: event.createdAt ?? null
         };
       } else if (event.actionId) {
@@ -97,17 +161,17 @@ export function reduceSessionEvent(state, event) {
   return next;
 }
 
-function appendProcessedEventId(processedEventIds, eventId) {
+function appendProcessedEventId(processedEventIds: readonly string[], eventId: string | undefined): string[] {
   if (!eventId) {
-    return processedEventIds;
+    return [...processedEventIds];
   }
 
   return [...processedEventIds, eventId].slice(-MAX_PROCESSED_EVENT_IDS);
 }
 
-function toSafeProposedActionView(action) {
+function toSafeProposedActionView(action: UnsafeProposedAction): ProposedActionView {
   return {
-    actionId: action.actionId,
+    actionId: action.actionId as string,
     actionType: action.actionType ?? null,
     resourceId: action.resourceId ?? null,
     resourceTitle: action.resourceTitle ?? null,
@@ -118,7 +182,7 @@ function toSafeProposedActionView(action) {
   };
 }
 
-function appendAssistantDelta(state, event) {
+function appendAssistantDelta(state: SessionState, event: SessionEvent): void {
   const messageId = event.messageId ?? "assistant-active";
   const existingIndex = state.messages.findIndex((message) => message.messageId === messageId);
   const delta = typeof event.delta === "string" ? event.delta : "";
@@ -140,7 +204,7 @@ function appendAssistantDelta(state, event) {
   };
 }
 
-function finalizeAssistantMessage(state, event) {
+function finalizeAssistantMessage(state: SessionState, event: SessionEvent): void {
   const messageId = event.messageId ?? "assistant-active";
   const existingIndex = state.messages.findIndex((message) => message.messageId === messageId);
   const content = typeof event.content === "string" ? event.content : null;

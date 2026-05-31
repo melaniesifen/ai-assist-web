@@ -14,7 +14,21 @@ export const ERROR_CATEGORIES = Object.freeze({
   INTERNAL: "INTERNAL"
 });
 
-const SAFE_MESSAGES = Object.freeze({
+export type ErrorCategory = (typeof ERROR_CATEGORIES)[keyof typeof ERROR_CATEGORIES];
+
+type UnsafeErrorInput = {
+  category?: string;
+  code?: string;
+};
+
+export type UserFacingError = {
+  category: ErrorCategory;
+  code: string;
+  message: string;
+  retryable: boolean;
+};
+
+const SAFE_MESSAGES: Readonly<Record<ErrorCategory, string>> = Object.freeze({
   [ERROR_CATEGORIES.AUTHENTICATION]: "Sign in again to continue.",
   [ERROR_CATEGORIES.AUTHORIZATION]: "You do not have access to that resource.",
   [ERROR_CATEGORIES.RATE_LIMITED]: "Too many requests. Wait a moment and try again.",
@@ -30,24 +44,31 @@ const SAFE_MESSAGES = Object.freeze({
   [ERROR_CATEGORIES.INTERNAL]: "Something went wrong. Try again later."
 });
 
+const RETRYABLE_CATEGORIES = new Set<ErrorCategory>([
+  ERROR_CATEGORIES.RATE_LIMITED,
+  ERROR_CATEGORIES.DEPENDENCY,
+  ERROR_CATEGORIES.PROVIDER_QUOTA,
+  ERROR_CATEGORIES.KMS,
+  ERROR_CATEGORIES.INTERNAL
+]);
+
 const SAFE_ERROR_CODE_PATTERN = /^[A-Z][A-Z0-9_]{0,63}$/;
 
-export function mapUserFacingError(error = {}) {
-  const category = SAFE_MESSAGES[error.category] ? error.category : ERROR_CATEGORIES.INTERNAL;
-  const retryable = category === ERROR_CATEGORIES.RATE_LIMITED
-    || category === ERROR_CATEGORIES.DEPENDENCY
-    || category === ERROR_CATEGORIES.PROVIDER_QUOTA
-    || category === ERROR_CATEGORIES.KMS
-    || category === ERROR_CATEGORIES.INTERNAL;
+export function mapUserFacingError(error: UnsafeErrorInput = {}): UserFacingError {
+  const category = isKnownCategory(error.category) ? error.category : ERROR_CATEGORIES.INTERNAL;
 
   return {
     category,
     code: normalizeSafeErrorCode(error.code),
     message: SAFE_MESSAGES[category],
-    retryable
+    retryable: RETRYABLE_CATEGORIES.has(category)
   };
 }
 
-function normalizeSafeErrorCode(code) {
+function isKnownCategory(category: string | undefined): category is ErrorCategory {
+  return typeof category === "string" && Object.hasOwn(SAFE_MESSAGES, category);
+}
+
+function normalizeSafeErrorCode(code: string | undefined): string {
   return typeof code === "string" && SAFE_ERROR_CODE_PATTERN.test(code) ? code : "UNKNOWN";
 }

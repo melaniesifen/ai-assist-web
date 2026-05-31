@@ -8,7 +8,25 @@ export const PROPOSED_ACTION_STATUSES = Object.freeze({
   FAILED: "FAILED"
 });
 
-const TERMINAL_STATUSES = new Set([
+export type ProposedActionStatus = (typeof PROPOSED_ACTION_STATUSES)[keyof typeof PROPOSED_ACTION_STATUSES];
+
+export type ProposedActionInput = {
+  actionId?: string;
+  status?: string;
+};
+
+export type ProposedActionState = {
+  actionId: string | null;
+  status: string;
+  isTerminal: boolean;
+  requiresConflictReview: boolean;
+  canApprove: boolean;
+  canReject: boolean;
+  canApply: boolean;
+  label: string;
+};
+
+const TERMINAL_STATUSES = new Set<string>([
   PROPOSED_ACTION_STATUSES.APPLIED,
   PROPOSED_ACTION_STATUSES.REJECTED,
   PROPOSED_ACTION_STATUSES.EXPIRED,
@@ -16,7 +34,7 @@ const TERMINAL_STATUSES = new Set([
   PROPOSED_ACTION_STATUSES.FAILED
 ]);
 
-export function getProposedActionState(action = {}) {
+export function getProposedActionState(action: ProposedActionInput = {}): ProposedActionState {
   const status = action.status ?? PROPOSED_ACTION_STATUSES.PROPOSED;
   const isTerminal = TERMINAL_STATUSES.has(status);
   const requiresConflictReview = status === PROPOSED_ACTION_STATUSES.CONFLICTED;
@@ -33,7 +51,7 @@ export function getProposedActionState(action = {}) {
   };
 }
 
-export function getActionStatusLabel(status) {
+export function getActionStatusLabel(status: string): string {
   switch (status) {
     case PROPOSED_ACTION_STATUSES.PROPOSED:
       return "Needs review";

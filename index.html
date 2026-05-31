@@ -4,56 +4,9 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>AI Assist Platform</title>
-    <link rel="stylesheet" href="./src/styles.css">
   </head>
   <body>
-    <main class="shell" aria-labelledby="app-title">
-      <section class="topbar">
-        <div>
-          <p class="eyebrow">Trusted MVP</p>
-          <h1 id="app-title">AI Assist</h1>
-        </div>
-        <span class="status-pill">Static shell</span>
-      </section>
-
-      <section class="layout" aria-label="Application shell preview">
-        <aside class="panel">
-          <h2>Onboarding</h2>
-          <ol class="steps">
-            <li class="done">Sign in</li>
-            <li class="done">Connect Google</li>
-            <li class="current">Add provider key</li>
-            <li>Select resource</li>
-          </ol>
-        </aside>
-
-        <section class="workspace">
-          <div class="toolbar" aria-label="Context mode">
-            <button class="selected" type="button">Selection</button>
-            <button type="button">Active resource</button>
-          </div>
-
-          <article class="chat-card">
-            <p class="label">Session</p>
-            <h2>Google Docs writing workflow</h2>
-            <p class="body-copy">
-              Framework-ready shell for onboarding, context consent, provider
-              setup, streamed assistant events, and proposed-action review.
-            </p>
-          </article>
-
-          <article class="action-card">
-            <div>
-              <p class="label">Proposed action</p>
-              <strong>Replace selected text</strong>
-            </div>
-            <div class="actions">
-              <button type="button">Reject</button>
-              <button class="primary" type="button">Approve</button>
-            </div>
-          </article>
-        </section>
-      </section>
-    </main>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
