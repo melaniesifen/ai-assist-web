@@ -40,6 +40,10 @@ providers directly. Provider credentials are user-entered, posted to backend
 services, KMS-encrypted as short-lived session secrets, and represented in the UI
 only by safe status metadata.
 
+## Task Breakdown
+
+Implementation tasks are tracked in [TASKS.md](TASKS.md). Update the checkboxes there in the same change that implements or verifies a task.
+
 ## Testing And Coverage
 
 Run the unit tests with either command:
