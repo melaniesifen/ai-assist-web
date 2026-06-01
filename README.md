@@ -18,6 +18,9 @@ safe-error behavior in pure TypeScript helpers with unit tests.
   Anthropic, and future Bedrock mode.
 - `src/session-events.ts`: reducer for SSE-style session events.
 - `src/proposed-actions.ts`: user-facing proposed-action state helpers.
+- `src/extension-surface.ts`: Google Docs browser-extension MVP surface
+  contract for page support, document ID detection, backend ownership, and safe
+  user-facing states.
 - `src/error-mapping.ts`: safe error category/code to user-message mapping.
 - `test/*.test.ts`: contract-oriented unit tests using Vitest.
 
@@ -43,6 +46,40 @@ The browser must never receive provider API keys from the backend or call model
 providers directly. Provider credentials are user-entered, posted to backend
 services, KMS-encrypted as short-lived session secrets, and represented in the UI
 only by safe status metadata.
+
+## Google Docs Extension MVP Surface
+
+`ai-assist-web` is not the ideal long-term home for packaged browser-extension
+code. If a dedicated `ai-assist-browser-extension` repo is created, it should
+own the manifest, content script, extension panel shell, browser permissions,
+and release packaging. Until then, this repo owns the typed MVP surface contract
+so web and future extension UI stay aligned.
+
+The extension-owned surface is limited to:
+
+1. Detect supported Google Docs document pages at `docs.google.com/document/...`.
+2. Inject one floating assistant button only when a current document ID is
+   available.
+3. Open a compact assistant panel tied to that document.
+4. Send the detected document ID as resource metadata to backend-owned HTTP
+   command APIs and SSE subscriptions.
+5. Keep raw prompts, selected text, document text, model responses, screenshots,
+   accessibility content, and proposed-action payloads only in active
+   user-visible state.
+
+Backend services own product auth, Google OAuth tokens, provider credentials,
+model-provider calls, Google Docs read/mutation APIs, proposed-action storage,
+approval/rejection, idempotent apply-action, and status events. Extension code
+must not call OpenAI, Anthropic, Google mutation APIs, secret storage, or direct
+OAuth token endpoints.
+
+`src/extension-surface.ts` exposes typed user-facing states:
+
+- `READY`: supported Google Docs document page with a detected document ID.
+- `UNSUPPORTED_PAGE`: no assistant injection because the page is outside the
+  supported Google Docs document surface.
+- `MISSING_DOCUMENT_ID`: Google Docs page shape is recognized, but no usable
+  document ID is available.
 
 ## Task Breakdown
 

@@ -16,7 +16,11 @@ The preferred MVP direction is hosted convenience mode with user-provided creden
 - Amazon Bedrock can be added as an optional hosted or self-hosted provider path.
 - Self-hosted deployment remains a future-supported path through IaC such as CDK.
 
-The platform should feel like "ChatGPT inside the workflow" for the first Google Docs use case, while keeping reusable platform boundaries intact.
+The first product surface should feel like "ChatGPT inside the workflow" for
+Google Docs: a browser extension injects a floating button on supported Google
+Docs document pages, opens a compact assistant panel, detects the current
+document ID, and calls backend-owned HTTP/SSE APIs. The standalone web app
+remains useful for onboarding, settings, dashboards, and fallback workflows.
 
 ## MVP Scope
 
@@ -27,6 +31,8 @@ The MVP should support:
 - User-provided OpenAI or Anthropic key validation.
 - KMS-encrypted `SessionSecrets` with an 8-hour TTL.
 - Google Docs resource selection.
+- Browser-extension surface for Google Docs with a floating button, compact
+  assistant panel, and current-document detection.
 - Context modes `SELECTION` and `ACTIVE_RESOURCE`.
 - Assistant command creation through authenticated HTTP APIs.
 - Assistant response streaming over SSE.
@@ -46,6 +52,8 @@ Deferred until later:
 - Persistent remembered provider keys.
 - Long-term conversation or content storage.
 - App-level DynamoDB rate-limit counters.
+- Direct provider calls, Google mutation API calls, or secret storage from
+  browser-extension clients.
 
 ## Core Architecture Decisions
 
@@ -61,6 +69,9 @@ Deferred until later:
 - Treat `tenantId` as first-class from day one. Do not make `tenantId = userId` a permanent contract.
 - Enforce context consent and context mode server-side.
 - Require connector-verified provenance for write-back. Client-supplied text may inform model context, but cannot authorize mutation.
+- Keep browser-extension code as a client surface only: it may identify the
+  current document and host the review UI, but backend services own Google
+  OAuth, provider calls, proposed actions, and mutation.
 - Do not log or retain raw prompts, document text, selected text, model responses, screenshots, OCR, accessibility-tree captures, provider keys, OAuth tokens, or decrypted action payloads by default.
 
 ## Service Boundaries
@@ -68,6 +79,9 @@ Deferred until later:
 Expected repos/services:
 
 - `ai-assist-web`: onboarding, dashboard, chat/session UI, provider setup, resource picker, SSE client, proposed-action review UI.
+- `ai-assist-browser-extension` or equivalent future repo: Google Docs floating
+  button, compact assistant panel, current-document detection, PR-style diff
+  review surface, and extension-to-backend command calls.
 - `ai-assist-auth-service`: product auth, tenant/user identity, Google OAuth lifecycle, token encryption/storage coordination, authZ helpers.
 - `ai-assist-secrets-service`: short-lived provider API keys, KMS encryption/decryption, fingerprints, TTL, validation status.
 - `ai-assist-session-events-service`: transport-neutral `SessionEvent` delivery, SSE stream lifecycle, future WebSocket adapter boundary.
@@ -107,14 +121,16 @@ First-run flow:
 
 Ask flow:
 
-1. User chooses `SELECTION` or `ACTIVE_RESOURCE`.
-2. Frontend sends an authenticated HTTP command.
-3. Orchestration validates ownership, consent, and effective context mode.
-4. Context service and Google Docs adapter return normalized, provenance-tagged context.
-5. Orchestration builds the prompt without logging raw content.
-6. Provider adapter calls the selected model provider using a decrypted secret reference.
-7. Orchestration publishes `progress`, `assistant.delta`, and `assistant.final` events through the session events service.
-8. Frontend renders the stream over SSE.
+1. User opens the assistant from the Google Docs floating button or web UI.
+2. Client identifies the current Google Doc or selected resource.
+3. User chooses `SELECTION` or `ACTIVE_RESOURCE`.
+4. Frontend or extension sends an authenticated HTTP command.
+5. Orchestration validates ownership, consent, and effective context mode.
+6. Context service and Google Docs adapter return normalized, provenance-tagged context.
+7. Orchestration builds the prompt without logging raw content.
+8. Provider adapter calls the selected model provider using a decrypted secret reference.
+9. Orchestration publishes `progress`, `assistant.delta`, and `assistant.final` events through the session events service.
+10. Client renders the stream over SSE.
 
 Write-back flow:
 
@@ -132,6 +148,8 @@ Write-back flow:
 - Services authorize every reference such as session ID, resource ID, action ID, and grant ID.
 - OAuth tokens and provider keys are encrypted with KMS.
 - Provider keys never appear in frontend code, browser extensions, Tampermonkey scripts, logs, or API responses.
+- Browser extensions never call OpenAI, Anthropic, Google mutation APIs, or
+  secret storage directly.
 - Session secrets expire at read time even if database TTL cleanup has not run.
 - Write-back is impossible without connector-verified target metadata.
 - Apply-action is idempotent and must not duplicate provider writes.
@@ -148,10 +166,11 @@ Recommended order:
 4. Google Docs read flow.
 5. Provider adapter validation and generation.
 6. HTTP command API and SSE stream.
-7. Proposed actions.
+7. Proposed actions and PR-style diff review.
 8. Safe apply-action.
-9. Rate limits and logging.
-10. End-to-end MVP validation.
+9. Browser-extension Google Docs surface.
+10. Rate limits and logging.
+11. End-to-end MVP validation.
 
 The task breakdown currently groups work as:
 
@@ -183,7 +202,7 @@ Repo docs read for this context:
 
 ## Open Questions
 
-- Should the first product surface be standalone web app, Chrome extension, or Google Docs sidebar?
+- What is the minimum browser-extension implementation: Chrome-only first, or Chrome plus Firefox from the start?
 - What exact Google OAuth scopes are required for the first MVP?
 - How much document context should `ACTIVE_RESOURCE` fetch automatically?
 - What consent UX should back `ContextConsentGrants`, especially future workspace and screen modes?
@@ -192,4 +211,3 @@ Repo docs read for this context:
 - What metadata retention period should logs use?
 - Which second connector should prove extensibility first: local Markdown, Notion, GitHub PRs, Gmail, or Obsidian?
 - After OpenAI and Anthropic direct adapters, should the next provider be Bedrock-hosted Claude, Gemini, or local models?
-
