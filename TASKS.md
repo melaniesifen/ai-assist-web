@@ -38,6 +38,8 @@ Relevant design sources: frontend, provider-key, command, SSE, context, proposed
 - [ ] ACTION-004: Add safe apply-action UI that requires backend apply results, handles idempotent retries, and never calls connector mutation APIs directly.
 - [x] ACTION-004: Provide bootstrap proposed-action status helpers for review, approval, rejection, applied, conflicted, failed, and expired states.
 - [ ] ACTION-005: Limit MVP write-back UI to connector-verified safe replace/insert proposals.
+- [ ] EXT-001: Define the Google Docs browser-extension MVP surface, including supported-page injection, compact assistant panel behavior, current document ID detection, backend-only HTTP/SSE calls, no sensitive local retention, and typed user-facing unsupported-page or missing-document states.
+- [ ] EXT-002: Implement PR-style proposed-edit review UI for Google Docs edits with target text, replacement text, surrounding context, rationale, status, action ID, individual approve/reject controls, safe approve-all behavior, backend-only apply-action with idempotency key, and conflict rendering for stale, ambiguous, overlapping, or unverifiable targets.
 - [ ] OPS-003: Verify browser logs and client-side error handling exclude provider keys, OAuth tokens, bearer tokens, prompts, selected text, document text, model responses, screenshots, OCR text, accessibility-tree content, and action payloads.
 - [ ] SAFE-003: Verify the frontend does not retain raw prompts, document text, model responses, screenshots, OCR text, accessibility trees, or action payloads outside the active user-visible session state.
 - [ ] INFRA-005: Document required local frontend configuration for service endpoints, tenant/user bootstrap, provider adapters, Google OAuth, and stubbed services.
