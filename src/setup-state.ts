@@ -36,6 +36,8 @@ const PROVIDER_LABELS: Readonly<Record<string, string>> = Object.freeze({
   BEDROCK: "Amazon Bedrock"
 });
 
+const AUTH_PRODUCT_SESSION_LABEL = "Auth / product session";
+
 const SAFE_ERROR_MESSAGES: Readonly<Record<string, string>> = Object.freeze({
   product_session_required: "Sign in before continuing setup.",
   product_session_expired: "Your product session expired. Sign in again.",
@@ -423,7 +425,7 @@ function mapProductSession(session: ProductSessionStatusRef): SetupCardViewModel
   if (session.status === PRODUCT_SESSION_STATUSES.AUTHENTICATED) {
     return {
       id: "product-session",
-      label: "Product session",
+      label: AUTH_PRODUCT_SESSION_LABEL,
       status: "Authenticated",
       tone: "ready",
       message: "Signed in with a server-derived tenant and user.",
@@ -439,7 +441,7 @@ function mapProductSession(session: ProductSessionStatusRef): SetupCardViewModel
   if (session.status === PRODUCT_SESSION_STATUSES.EXPIRED) {
     return {
       id: "product-session",
-      label: "Product session",
+      label: AUTH_PRODUCT_SESSION_LABEL,
       status: "Expired",
       tone: "blocked",
       message: "Sign in again before continuing setup.",
@@ -449,7 +451,7 @@ function mapProductSession(session: ProductSessionStatusRef): SetupCardViewModel
 
   return {
     id: "product-session",
-    label: "Product session",
+    label: AUTH_PRODUCT_SESSION_LABEL,
     status: "Anonymous",
     tone: "action",
     message: "Sign in to create a product session.",
