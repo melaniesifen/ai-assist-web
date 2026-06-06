@@ -34,14 +34,14 @@ Relevant design sources: frontend, provider-key, command, SSE, context, proposed
 - [ ] EVT-003: Add an authenticated SSE client for session streams with reconnect, `Last-Event-ID`, event ID dedupe, and HTTP durable-state refresh after gaps.
 - [ ] EVT-003: Add integration tests with mocked backend HTTP and SSE endpoints for onboarding, context preview, command creation, session events, proposed actions, and apply-action flows.
 - [x] EVT-003: Provide a bootstrap session-event reducer for progress, assistant deltas, assistant final, errors, action proposed, and action status changed.
-- [ ] ACTION-003: Add proposed-action approve/reject UI that uses authenticated HTTP commands and treats duplicate responses deterministically.
-- [ ] ACTION-004: Add safe apply-action UI that requires backend apply results, handles idempotent retries, and never calls connector mutation APIs directly.
+- [x] ACTION-003: Add M2 proposed-action approve/reject UI that creates backend-shaped action decision commands and treats duplicate responses deterministically.
+- [x] ACTION-004: Add M2 safe apply-action UI that creates backend-shaped apply commands with idempotency keys, requires backend-shaped apply results before terminal states, handles duplicate apply attempts deterministically, and never calls connector mutation APIs directly.
 - [x] ACTION-004: Provide bootstrap proposed-action status helpers for review, approval, rejection, applied, conflicted, failed, and expired states.
-- [ ] ACTION-005: Limit MVP write-back UI to connector-verified safe replace/insert proposals.
+- [x] ACTION-005: Limit M2 write-back UI to connector-verified safe replace/insert proposals.
 - [x] EXT-001: Define the Google Docs browser-extension MVP surface, including supported-page injection, compact assistant panel behavior, current document ID detection, backend-only HTTP/SSE calls, no sensitive local retention, and typed user-facing unsupported-page or missing-document states.
-- [ ] EXT-002: Implement browser sidebar/side-panel PR-style proposed-edit review UI for Google Docs edits with target text, replacement text, surrounding context, rationale, status, action ID, individual approve/reject controls, safe approve-all behavior, backend-only apply-action with idempotency key, and conflict rendering for stale, ambiguous, overlapping, or unverifiable targets.
-- [ ] OPS-003: Verify browser logs and client-side error handling exclude provider keys, OAuth tokens, bearer tokens, prompts, selected text, document text, model responses, screenshots, OCR text, accessibility-tree content, and action payloads.
-- [ ] SAFE-003: Verify the frontend does not retain raw prompts, document text, model responses, screenshots, OCR text, accessibility trees, or action payloads outside the active user-visible session state.
+- [x] EXT-002: Implement browser sidebar/side-panel PR-style proposed-edit review UI for Google Docs edits with target text, replacement text, surrounding context, rationale, status, action ID, individual approve/reject controls, safe approve-all behavior, backend-shaped apply-action with idempotency key, and conflict rendering for stale, ambiguous, overlapping, or unverifiable targets.
+- [x] OPS-003: Verify M2 browser logs and client-side error handling exclude provider keys, OAuth tokens, bearer tokens, prompts, selected text, document text, model responses, screenshots, OCR text, accessibility-tree content, and action payloads.
+- [x] SAFE-003: Verify the M2 frontend does not retain raw prompts, document text, model responses, screenshots, OCR text, accessibility trees, or action payloads outside active user-visible session state.
 - [ ] INFRA-005: Document required local frontend configuration for service endpoints, tenant/user bootstrap, provider adapters, Google OAuth, and stubbed services.
 - [ ] INFRA-005: Add deployment-style pipeline tasks for frontend install, lint or static checks, unit tests, browser integration tests, build artifact generation, and Amplify hosting handoff.
 - [ ] INFRA-005: Add deployment readiness checks for endpoint configuration, auth/OAuth redirect settings, SSE connectivity, CSP, and no-secret client bundles.
@@ -54,6 +54,9 @@ Relevant design sources: frontend, provider-key, command, SSE, context, proposed
 - [x] Add tests that import and validate real M1 action review and apply-command fixtures from `ai-assist-contracts`.
 - [x] Split apply into a backend-shaped apply request plus mocked backend-shaped result before terminal `APPLIED`, `FAILED`, or `CONFLICTED` state.
 - [x] Clear mocked chat prompt state when the side panel closes.
+- [x] Keep the M2 primary UI as a browser sidebar/side-panel, with floating in-document affordances deferred.
+- [x] Cover approve, reject, approve-all safety, duplicate handling, apply idempotency keys, conflict states, and safe logging in unit tests.
+- [ ] User-owned demo: run the local Vite UI and perform browser validation after implementation is committed.
 
 ## E2E-Owned UI Validation
 

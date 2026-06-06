@@ -68,7 +68,7 @@ The extension-owned surface is limited to:
 5. Send the detected document ID as resource metadata to backend-owned HTTP
    command APIs and SSE subscriptions.
 6. Keep raw prompts, selected text, document text, model responses, screenshots,
-   accessibility content, and proposed-action payloads only in active
+   OCR text, accessibility content, and proposed-action payloads only in active
    user-visible state.
 
 Backend services own product auth, Google OAuth tokens, provider credentials,
@@ -83,6 +83,9 @@ The local M2 demo uses the sidebar/side-panel as the primary UI surface. It
 models a Google Docs content-script bridge for document metadata, keeps mocked
 chat state in active visible UI state, renders PR-style proposed-edit cards, and
 supports approve, reject, approve-all, and apply controls.
+
+The non-demo M2 web-side work is implemented and covered by unit tests. The
+remaining M2 validation step is the user-owned local browser demo.
 
 Apply does not mark an action applied from a client click. The Apply control
 creates a backend-shaped `actions.apply` command with an idempotency key. A

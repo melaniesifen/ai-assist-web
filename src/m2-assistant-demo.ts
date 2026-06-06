@@ -466,12 +466,12 @@ export function resolveApplyResult(card: ReviewCardViewModel, result: MockApplyR
   }
 
   if (result.status === PROPOSED_ACTION_STATUSES.CONFLICTED) {
-      const conflict = createConflictDisplayModel(
-        result.conflictReasonCode ?? "APPLY_TARGET_CONFLICTED",
-        card.originalTextHash ?? undefined,
-        card.targetRange !== null || card.targetAnchor !== null,
-        card.actionType
-      );
+    const conflict = createConflictDisplayModel(
+      result.conflictReasonCode ?? "APPLY_TARGET_CONFLICTED",
+      card.originalTextHash ?? undefined,
+      card.targetRange !== null || card.targetAnchor !== null,
+      card.actionType
+    );
 
     return {
       ...card,

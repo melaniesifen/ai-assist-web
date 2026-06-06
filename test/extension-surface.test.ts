@@ -5,14 +5,14 @@ import {
 } from "../src/extension-surface";
 
 describe("Google Docs extension surface contract", () => {
-  it("enables the floating button and compact panel for supported Google Docs document pages", () => {
+  it("enables the side panel and keeps floating affordances deferred for supported Google Docs document pages", () => {
     const surface = describeGoogleDocsExtensionSurface({
       url: "https://docs.google.com/document/d/doc_123-abc/edit"
     });
 
     expect(surface.state).toBe(EXTENSION_SURFACE_STATES.READY);
     expect(surface.documentId).toBe("doc_123-abc");
-    expect(surface.canInjectFloatingButton).toBe(true);
+    expect(surface.canInjectFloatingButton).toBe(false);
     expect(surface.canOpenAssistantPanel).toBe(true);
     expect(surface.userMessage).toBe("Assistant ready for this Google Doc.");
   });
@@ -56,7 +56,9 @@ describe("Google Docs extension surface contract", () => {
     });
 
     expect(surface.clientResponsibilities).toContain("Detect supported Google Docs pages before injecting UI.");
-    expect(surface.clientResponsibilities).toContain("Open a compact assistant panel tied to the active document.");
+    expect(surface.clientResponsibilities).toContain(
+      "Host the primary assistant UI in a browser sidebar or side panel tied to the active document."
+    );
     expect(surface.backendResponsibilities).toContain("Own authenticated HTTP command APIs and SSE session streams.");
     expect(surface.backendResponsibilities).toContain("Own all Google Docs read and mutation API calls through backend services.");
   });
@@ -71,6 +73,7 @@ describe("Google Docs extension surface contract", () => {
     expect(surface.forbiddenLocalRetention).toContain("raw prompts");
     expect(surface.forbiddenLocalRetention).toContain("document text");
     expect(surface.forbiddenLocalRetention).toContain("model responses");
+    expect(surface.forbiddenLocalRetention).toContain("OCR text");
     expect(surface.forbiddenLocalRetention).toContain("action payloads");
   });
 });
