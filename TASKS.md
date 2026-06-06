@@ -25,7 +25,7 @@ Relevant design sources: frontend, provider-key, command, SSE, context, proposed
 - [ ] AUTH-002: Add authenticated product-session UI flows for login, logout, session status, token expiry, refresh, and distinct unauthorized/expired/malformed credential states.
 - [ ] AUTH-003: Add Google OAuth connect, callback result, status, reconnect-required, and disconnect UI without exposing OAuth tokens.
 - [ ] AUTH-005: Add provider-key entry and validation UI that sends keys only to backend HTTPS APIs, displays metadata/fingerprint only, and handles validation rate limits safely.
-- [ ] CTX-001: Keep MVP context UI limited to `SELECTION` and `ACTIVE_RESOURCE`; show future modes as disabled until backend gates exist.
+- [x] CTX-001: Keep MVP context UI limited to `SELECTION` and `ACTIVE_RESOURCE`; show future modes as disabled until backend gates exist.
 - [x] CTX-001: Provide bootstrap context-mode labels and availability helpers.
 - [ ] CTX-002: Add consent-grant UI states for active, missing, revoked, and expired consent before context capture.
 - [ ] CTX-003: Render normalized context metadata and truncation/redaction indicators without logging or persisting raw document content.
@@ -39,12 +39,21 @@ Relevant design sources: frontend, provider-key, command, SSE, context, proposed
 - [x] ACTION-004: Provide bootstrap proposed-action status helpers for review, approval, rejection, applied, conflicted, failed, and expired states.
 - [ ] ACTION-005: Limit MVP write-back UI to connector-verified safe replace/insert proposals.
 - [x] EXT-001: Define the Google Docs browser-extension MVP surface, including supported-page injection, compact assistant panel behavior, current document ID detection, backend-only HTTP/SSE calls, no sensitive local retention, and typed user-facing unsupported-page or missing-document states.
-- [ ] EXT-002: Implement PR-style proposed-edit review UI for Google Docs edits with target text, replacement text, surrounding context, rationale, status, action ID, individual approve/reject controls, safe approve-all behavior, backend-only apply-action with idempotency key, and conflict rendering for stale, ambiguous, overlapping, or unverifiable targets.
+- [ ] EXT-002: Implement browser sidebar/side-panel PR-style proposed-edit review UI for Google Docs edits with target text, replacement text, surrounding context, rationale, status, action ID, individual approve/reject controls, safe approve-all behavior, backend-only apply-action with idempotency key, and conflict rendering for stale, ambiguous, overlapping, or unverifiable targets.
 - [ ] OPS-003: Verify browser logs and client-side error handling exclude provider keys, OAuth tokens, bearer tokens, prompts, selected text, document text, model responses, screenshots, OCR text, accessibility-tree content, and action payloads.
 - [ ] SAFE-003: Verify the frontend does not retain raw prompts, document text, model responses, screenshots, OCR text, accessibility trees, or action payloads outside the active user-visible session state.
 - [ ] INFRA-005: Document required local frontend configuration for service endpoints, tenant/user bootstrap, provider adapters, Google OAuth, and stubbed services.
 - [ ] INFRA-005: Add deployment-style pipeline tasks for frontend install, lint or static checks, unit tests, browser integration tests, build artifact generation, and Amplify hosting handoff.
 - [ ] INFRA-005: Add deployment readiness checks for endpoint configuration, auth/OAuth redirect settings, SSE connectivity, CSP, and no-secret client bundles.
+
+## M2 Local Sidebar Demo Progress
+
+- [x] Implement a sidebar/side-panel assistant shell as the primary M2 UI surface for the local demo.
+- [x] Model a Google Docs content-script bridge view model for document ID, URL, title, support state, and revision metadata.
+- [x] Render PR-style proposed-edit cards from M1 contract-compatible data.
+- [x] Add tests that import and validate real M1 action review and apply-command fixtures from `ai-assist-contracts`.
+- [x] Split apply into a backend-shaped apply request plus mocked backend-shaped result before terminal `APPLIED`, `FAILED`, or `CONFLICTED` state.
+- [x] Clear mocked chat prompt state when the side panel closes.
 
 ## E2E-Owned UI Validation
 

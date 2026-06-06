@@ -10,7 +10,7 @@ safe-error behavior in pure TypeScript helpers with unit tests.
 
 - `index.html`: Vite HTML entrypoint.
 - `src/main.tsx`: React root renderer.
-- `src/App.tsx`: MVP shell using the tested state helpers.
+- `src/App.tsx`: sidebar/side-panel M2 demo shell using the tested state helpers.
 - `src/onboarding-state.ts`: onboarding step derivation for auth, Google,
   provider setup, and resource session readiness.
 - `src/context-modes.ts`: context mode labels and availability state.
@@ -21,6 +21,9 @@ safe-error behavior in pure TypeScript helpers with unit tests.
 - `src/extension-surface.ts`: Google Docs browser-extension MVP surface
   contract for page support, document ID detection, backend ownership, and safe
   user-facing states.
+- `src/m2-assistant-demo.ts`: local M2 side-panel demo helpers for content-script
+  bridge metadata, mocked chat state, PR-style review cards, approve/reject,
+  approve-all, backend-shaped apply requests, and mocked apply results.
 - `src/error-mapping.ts`: safe error category/code to user-message mapping.
 - `test/*.test.ts`: contract-oriented unit tests using Vitest.
 
@@ -51,19 +54,20 @@ only by safe status metadata.
 
 `ai-assist-web` is not the ideal long-term home for packaged browser-extension
 code. If a dedicated `ai-assist-browser-extension` repo is created, it should
-own the manifest, content script, extension panel shell, browser permissions,
-and release packaging. Until then, this repo owns the typed MVP surface contract
-so web and future extension UI stay aligned.
+own the manifest, content script, browser sidebar or side-panel shell, browser
+permissions, and release packaging. Until then, this repo owns the typed MVP
+surface contract so web and future extension UI stay aligned.
 
 The extension-owned surface is limited to:
 
 1. Detect supported Google Docs document pages at `docs.google.com/document/...`.
-2. Inject one floating assistant button only when a current document ID is
-   available.
-3. Open a compact assistant panel tied to that document.
-4. Send the detected document ID as resource metadata to backend-owned HTTP
+2. Host the main assistant UI in a browser sidebar or side panel.
+3. Use a Google Docs content script to report the current document ID and future
+   allowed page context to the sidebar/side-panel UI.
+4. Optionally expose a small in-document open-assistant affordance later.
+5. Send the detected document ID as resource metadata to backend-owned HTTP
    command APIs and SSE subscriptions.
-5. Keep raw prompts, selected text, document text, model responses, screenshots,
+6. Keep raw prompts, selected text, document text, model responses, screenshots,
    accessibility content, and proposed-action payloads only in active
    user-visible state.
 
@@ -72,6 +76,22 @@ model-provider calls, Google Docs read/mutation APIs, proposed-action storage,
 approval/rejection, idempotent apply-action, and status events. Extension code
 must not call OpenAI, Anthropic, Google mutation APIs, secret storage, or direct
 OAuth token endpoints.
+
+## M2 Local Side-Panel Demo
+
+The local M2 demo uses the sidebar/side-panel as the primary UI surface. It
+models a Google Docs content-script bridge for document metadata, keeps mocked
+chat state in active visible UI state, renders PR-style proposed-edit cards, and
+supports approve, reject, approve-all, and apply controls.
+
+Apply does not mark an action applied from a client click. The Apply control
+creates a backend-shaped `actions.apply` command with an idempotency key. A
+separate mocked backend-shaped result transitions the card to `APPLIED`,
+`FAILED`, or `CONFLICTED`.
+
+Runtime demo data stays contract-compatible without importing sibling fixtures
+into the browser bundle. Tests import and validate the real M1 fixtures from
+`ai-assist-contracts`.
 
 `src/extension-surface.ts` exposes typed user-facing states:
 

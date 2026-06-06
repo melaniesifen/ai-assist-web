@@ -1,80 +1,151 @@
-import type { ReactElement } from "react";
-import { CONTEXT_MODE_IDS, getContextModeOptions } from "./context-modes";
-import { getOnboardingProgress } from "./onboarding-state";
-import { getProposedActionState } from "./proposed-actions";
-import { MODEL_PROVIDERS, getProviderSetupStatus } from "./provider-setup";
-import { createInitialSessionState, reduceSessionEvent } from "./session-events";
+import { type ReactElement, useMemo, useState } from "react";
+import { describeGoogleDocsExtensionSurface } from "./extension-surface";
+import {
+  DEMO_DOCUMENT_URL,
+  DEMO_REVIEW_FIXTURES,
+  M2_SESSION_ID,
+  applyReviewCard,
+  approveAllReviewCards,
+  approveReviewCard,
+  closeAssistantShell,
+  createAssistantShellState,
+  createContentScriptBridgeViewModel,
+  createInitialMockChatState,
+  createMockApplyResult,
+  createReviewCardsFromFixtures,
+  getApproveAllState,
+  getM2ContextModeOptions,
+  openAssistantShell,
+  rejectReviewCard,
+  resolveApplyResult,
+  submitMockChatMessage,
+  type AssistantShellState,
+  type ReviewCardViewModel
+} from "./m2-assistant-demo";
 
-const onboarding = getOnboardingProgress({
-  isSignedIn: true,
-  hasGoogleConnection: true,
-  providerStatus: "READY",
-  hasResourceSession: false
-});
-
-const contextModes = getContextModeOptions({
-  activeResourceConnected: true,
-  consentedModes: [CONTEXT_MODE_IDS.ACTIVE_RESOURCE]
-});
-
-const providerStatus = getProviderSetupStatus({
-  provider: MODEL_PROVIDERS.OPENAI,
-  validationStatus: "VALID",
-  fingerprint: "fp_123",
-  expiresAt: "8 hours"
-});
-
-const proposedAction = getProposedActionState({
-  actionId: "action-1",
-  status: "PROPOSED"
-});
-
-const sessionState = [
-  {
-    eventId: "evt-1",
-    type: "transport.connected"
-  },
-  {
-    eventId: "evt-2",
-    type: "progress",
-    message: "Context preview ready"
-  },
-  {
-    eventId: "evt-3",
-    type: "assistant.delta",
-    messageId: "msg-1",
-    delta: "I can help revise the selected paragraph."
-  }
-].reduce(reduceSessionEvent, createInitialSessionState());
+const EMPTY_CHAT_INPUT = "";
 
 export function App(): ReactElement {
+  const extensionSurface = useMemo(() => describeGoogleDocsExtensionSurface({ url: DEMO_DOCUMENT_URL }), []);
+  const initialShell = useMemo(
+    () =>
+      createAssistantShellState(
+        createContentScriptBridgeViewModel({
+          supportState: extensionSurface.state,
+          documentId: extensionSurface.documentId,
+          url: DEMO_DOCUMENT_URL
+        })
+      ),
+    [extensionSurface.documentId, extensionSurface.state]
+  );
+  const [shellState, setShellState] = useState<AssistantShellState>(initialShell);
+  const [reviewCards, setReviewCards] = useState<ReviewCardViewModel[]>(() => createReviewCardsFromFixtures(DEMO_REVIEW_FIXTURES));
+  const [chatState, setChatState] = useState(createInitialMockChatState);
+  const [chatInput, setChatInput] = useState(EMPTY_CHAT_INPUT);
+  const contextModes = getM2ContextModeOptions();
+  const approveAllState = getApproveAllState(reviewCards);
+  const selectedContextMode = contextModes.find((mode) => mode.mode === "SELECTION");
+  const activeResourceMode = contextModes.find((mode) => mode.mode === "ACTIVE_RESOURCE");
+  const latestCommand = reviewCards.reduce<ReviewCardViewModel["lastCommand"]>(
+    (command, card) => card.lastCommand ?? command,
+    null
+  );
+
+  function updateCard(actionId: string, updater: (card: ReviewCardViewModel) => ReviewCardViewModel): void {
+    setReviewCards((cards) => cards.map((card) => (card.actionId === actionId ? updater(card) : card)));
+  }
+
+  function submitChat(): void {
+    setChatState((state) => submitMockChatMessage(state, chatInput));
+    setChatInput(EMPTY_CHAT_INPUT);
+  }
+
+  function closePanel(): void {
+    setShellState((state) => closeAssistantShell(state));
+    setChatState(createInitialMockChatState());
+    setChatInput(EMPTY_CHAT_INPUT);
+  }
+
   return (
-    <main className="shell" aria-labelledby="app-title">
-      <section className="topbar">
-        <div>
-          <p className="eyebrow">Trusted MVP</p>
-          <h1 id="app-title">AI Assist</h1>
-        </div>
-        <span className="status-pill">React + Vite</span>
+    <main className="sidepanel-demo" aria-labelledby="app-title">
+      <section className="document-preview" aria-label="Google Docs content-script bridge preview">
+        <header className="document-header">
+          <div>
+            <p className="eyebrow">Google Docs content-script bridge</p>
+            <h1 id="app-title">{shellState.bridge.title}</h1>
+          </div>
+          <dl className="doc-meta" aria-label="Current document metadata">
+            <div>
+              <dt>Document ID</dt>
+              <dd>{shellState.bridge.documentId ?? "Unavailable"}</dd>
+            </div>
+            <div>
+              <dt>Revision</dt>
+              <dd>{shellState.bridge.resourceRevision}</dd>
+            </div>
+            <div>
+              <dt>Source</dt>
+              <dd>{shellState.bridge.source}</dd>
+            </div>
+          </dl>
+        </header>
+
+        <article className="document-body" aria-label="Document preview">
+          <p>
+            This is a local Google Docs-style host preview. The assistant UI runs as a browser side panel and receives
+            metadata from the modeled content-script bridge.
+          </p>
+          <p>
+            The browser surface does not call provider APIs, OAuth endpoints, secret storage, or Google Docs mutation
+            APIs. Proposed edits stay review-only until a backend-shaped apply result is mocked.
+          </p>
+        </article>
+
+        {!shellState.panelOpen ? (
+          <button
+            className="primary open-panel-button"
+            disabled={!shellState.panelAvailable}
+            onClick={() => setShellState((state) => openAssistantShell(state))}
+            type="button"
+          >
+            Open side panel
+          </button>
+        ) : null}
       </section>
 
-      <section className="layout" aria-label="Application shell preview">
-        <aside className="panel">
-          <h2>Onboarding</h2>
-          <ol className="steps">
-            {onboarding.steps.map((step) => (
-              <li className={step.state} key={step.id}>
-                {step.label}
-              </li>
-            ))}
-          </ol>
-        </aside>
+      {shellState.panelOpen ? (
+        <aside className="assistant-sidepanel" aria-label="AI assistant side panel">
+          <header className="panel-header">
+            <div>
+              <p className="eyebrow">Assistant side panel</p>
+              <h2>Document review</h2>
+            </div>
+            <button aria-label="Close assistant side panel" className="icon-button" onClick={closePanel} type="button">
+              X
+            </button>
+          </header>
 
-        <section className="workspace">
-          <div className="toolbar" aria-label="Context mode">
+          <section className="panel-section metadata-strip" aria-label="Session metadata">
+            <dl>
+              <div>
+                <dt>Doc</dt>
+                <dd>{shellState.bridge.documentId ?? "Missing"}</dd>
+              </div>
+              <div>
+                <dt>Session</dt>
+                <dd>{M2_SESSION_ID}</dd>
+              </div>
+              <div>
+                <dt>Context</dt>
+                <dd>{selectedContextMode?.label ?? "Selection"}</dd>
+              </div>
+            </dl>
+          </section>
+
+          <section className="panel-section context-modes" aria-label="Context mode">
             {contextModes.map((mode) => (
               <button
-                className={mode.mode === CONTEXT_MODE_IDS.SELECTION ? "selected" : undefined}
+                className={mode.mode === "SELECTION" ? "selected" : undefined}
                 disabled={!mode.enabled}
                 key={mode.mode}
                 title={mode.disabledReason ?? mode.description}
@@ -83,44 +154,131 @@ export function App(): ReactElement {
                 {mode.label}
               </button>
             ))}
-          </div>
-
-          <article className="chat-card">
-            <p className="label">Session</p>
-            <h2>Google Docs writing workflow</h2>
-            <p className="body-copy">
-              TypeScript shell for onboarding, context consent, provider setup,
-              streamed assistant events, and proposed-action review.
+            <p className="mode-note">
+              {activeResourceMode?.enabled ? "Active resource is available from the bridge metadata." : activeResourceMode?.disabledReason}
             </p>
-            <dl className="status-grid">
-              <div>
-                <dt>Provider</dt>
-                <dd>{providerStatus.label}: {providerStatus.state}</dd>
-              </div>
-              <div>
-                <dt>Stream</dt>
-                <dd>{sessionState.connection}</dd>
-              </div>
-              <div>
-                <dt>Progress</dt>
-                <dd>{sessionState.progress.at(-1)?.message ?? "Idle"}</dd>
-              </div>
-            </dl>
-          </article>
+          </section>
 
-          <article className="action-card">
+          <section className="panel-section chat-box" aria-label="Mocked assistant chat">
+            <div className="message-list">
+              {chatState.messages.length === 0 ? (
+                <p className="empty-state">Submit a mocked request to show local progress and response state.</p>
+              ) : (
+                chatState.messages.map((message) => (
+                  <p className={`message ${message.role}`} key={message.id}>
+                    <span>{message.role}</span>
+                    {message.content}
+                  </p>
+                ))
+              )}
+            </div>
+            {chatState.progress ? <p className="progress-line">{chatState.progress}</p> : null}
+            <form
+              className="chat-form"
+              onSubmit={(event) => {
+                event.preventDefault();
+                submitChat();
+              }}
+            >
+              <label className="sr-only" htmlFor="mock-chat-input">Mock prompt</label>
+              <input
+                id="mock-chat-input"
+                onChange={(event) => setChatInput(event.target.value)}
+                placeholder="Ask about the selected text"
+                value={chatInput}
+              />
+              <button className="primary" type="submit">Send</button>
+            </form>
+          </section>
+
+          <section className="panel-section review-toolbar" aria-label="Review controls">
             <div>
-              <p className="label">Proposed action</p>
-              <strong>Replace selected text</strong>
-              <p className="action-status">{proposedAction.label}</p>
+              <h3>Proposed edits</h3>
+              <p>{approveAllState.reason ?? "Approve all is available for safe non-overlapping proposals."}</p>
             </div>
-            <div className="actions">
-              <button disabled={!proposedAction.canReject} type="button">Reject</button>
-              <button className="primary" disabled={!proposedAction.canApprove} type="button">Approve</button>
-            </div>
-          </article>
-        </section>
-      </section>
+            <button
+              className="primary"
+              disabled={!approveAllState.enabled}
+              onClick={() => setReviewCards((cards) => approveAllReviewCards(cards))}
+              type="button"
+            >
+              Approve all
+            </button>
+          </section>
+
+          <section className="review-list" aria-label="Proposed edit review cards">
+            {reviewCards.map((card) => (
+              <article className={`review-card ${card.status.toLowerCase()}`} key={card.actionId}>
+                <header className="review-card-header">
+                  <div>
+                    <p className="action-id">{card.actionId}</p>
+                    <h3>{card.actionType === "INSERT_TEXT" ? "Insert text" : "Replace text"}</h3>
+                  </div>
+                  <span className="status-badge">{card.pendingApplyCommand ? "Apply requested" : card.statusLabel}</span>
+                </header>
+
+                <div className="diff-box" aria-label={`Diff for ${card.actionId}`}>
+                  {card.targetText ? <p className="removed">- {card.targetText}</p> : null}
+                  <p className="added">+ {card.replacementText}</p>
+                </div>
+
+                <dl className="review-details">
+                  <div>
+                    <dt>Context</dt>
+                    <dd>{card.surroundingContext}</dd>
+                  </div>
+                  <div>
+                    <dt>Rationale</dt>
+                    <dd>{card.rationale}</dd>
+                  </div>
+                </dl>
+
+                {card.conflict ? (
+                  <div className="conflict-box" role="status">
+                    <strong>{card.conflict.title}</strong>
+                    <p>{card.conflict.message}</p>
+                  </div>
+                ) : null}
+
+                {card.lastCommand ? (
+                  <div className="command-box" aria-label="Last backend-shaped command">
+                    <span>{card.lastCommand.commandType}</span>
+                    {card.lastCommand.idempotencyKey ? <code>{card.lastCommand.idempotencyKey}</code> : null}
+                  </div>
+                ) : null}
+
+                {card.duplicateNotice ? <p className="duplicate-note">{card.duplicateNotice}</p> : null}
+
+                <div className="card-actions">
+                  <button disabled={!card.canReject} onClick={() => updateCard(card.actionId, rejectReviewCard)} type="button">
+                    Reject
+                  </button>
+                  <button disabled={!card.canApprove} onClick={() => updateCard(card.actionId, approveReviewCard)} type="button">
+                    Approve
+                  </button>
+                  <button className="primary" disabled={!card.canApply} onClick={() => updateCard(card.actionId, applyReviewCard)} type="button">
+                    Apply
+                  </button>
+                  <button
+                    disabled={card.pendingApplyCommand === null}
+                    onClick={() => updateCard(card.actionId, (current) => resolveApplyResult(current, createMockApplyResult(current)))}
+                    type="button"
+                  >
+                    Mock result
+                  </button>
+                </div>
+              </article>
+            ))}
+          </section>
+
+          {latestCommand ? (
+            <footer className="panel-footer">
+              Last command: {latestCommand.commandType}
+              {latestCommand.idempotencyKey ? ` with ${latestCommand.idempotencyKey}` : ""}
+            </footer>
+          ) : null}
+        </aside>
+      ) : null}
     </main>
   );
 }
