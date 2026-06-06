@@ -6,6 +6,7 @@ coverage/
 .nyc_output/
 .c8/
 test-results/
+playwright-report/
 junit.xml
 tap-report/
 dist/
