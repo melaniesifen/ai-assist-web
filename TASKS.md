@@ -56,7 +56,7 @@ Relevant design sources: frontend, provider-key, command, SSE, context, proposed
 - [x] Clear mocked chat prompt state when the side panel closes.
 - [x] Keep the M2 primary UI as a browser sidebar/side-panel, with floating in-document affordances deferred.
 - [x] Cover approve, reject, approve-all safety, duplicate handling, apply idempotency keys, conflict states, and safe logging in unit tests.
-- [ ] User-owned demo: run the local Vite UI and perform browser validation after implementation is committed.
+- [x] Firefox Playwright demo validation passes for the local M2 sidebar/side-panel harness.
 
 ## E2E-Owned UI Validation
 
@@ -69,7 +69,7 @@ Relevant design sources: frontend, provider-key, command, SSE, context, proposed
 
 ## Quality Tasks
 
-- [ ] Raise line coverage to at least 95%.
+- [x] Raise line coverage to at least 95%.
 - [ ] Add accessibility and responsive layout checks.
-- [ ] Add browser-based end-to-end tests.
+- [x] Add browser-based end-to-end tests.
 - [ ] Add Amplify hosting integration in coordination with `ai-assist-infra`.
