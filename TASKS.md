@@ -46,6 +46,14 @@ Relevant design sources: frontend, provider-key, command, SSE, context, proposed
 - [ ] INFRA-005: Add deployment-style pipeline tasks for frontend install, lint or static checks, unit tests, browser integration tests, build artifact generation, and Amplify hosting handoff.
 - [ ] INFRA-005: Add deployment readiness checks for endpoint configuration, auth/OAuth redirect settings, SSE connectivity, CSP, and no-secret client bundles.
 
+## M3 First-Run Setup Progress
+
+- [x] Render backend-shaped setup state from M3-compatible local responses and contract fixtures in tests.
+- [x] Show login/session, Google OAuth, provider-secret, resource-session, and safe setup error states.
+- [x] Keep first-run setup context posture at `SELECTION`; future modes remain out of this setup harness.
+- [x] Verify setup log payloads exclude OAuth tokens, provider keys, bearer tokens, prompts, document text, model responses, screenshots, and action payloads.
+- [x] Add tests that import and validate real M3 setup fixtures from `ai-assist-contracts`.
+
 ## M2 Local Sidebar Demo Progress
 
 - [x] Implement a sidebar/side-panel assistant shell as the primary M2 UI surface for the local demo.

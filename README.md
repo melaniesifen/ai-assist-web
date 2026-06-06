@@ -16,6 +16,9 @@ safe-error behavior in pure TypeScript helpers with unit tests.
 - `src/context-modes.ts`: context mode labels and availability state.
 - `src/provider-setup.ts`: provider credential setup state for OpenAI,
   Anthropic, and future Bedrock mode.
+- `src/setup-state.ts`: M3 first-run setup state mapping for product session,
+  Google OAuth, provider-secret readiness, resource-session readiness, safe
+  setup errors, and metadata-only setup log events.
 - `src/session-events.ts`: reducer for SSE-style session events.
 - `src/proposed-actions.ts`: user-facing proposed-action state helpers.
 - `src/extension-surface.ts`: Google Docs browser-extension MVP surface
@@ -103,6 +106,18 @@ into the browser bundle. Tests import and validate the real M1 fixtures from
   supported Google Docs document surface.
 - `MISSING_DOCUMENT_ID`: Google Docs page shape is recognized, but no usable
   document ID is available.
+
+## M3 First-Run Setup Harness
+
+The local app also renders backend-shaped first-run setup states for M3. The
+setup harness covers product-session status, Google OAuth status,
+provider-secret readiness, resource-session readiness, safe user-facing errors,
+and the default `SELECTION` context posture.
+
+Tests import the real M3 setup fixtures from `ai-assist-contracts` and map them
+through `src/setup-state.ts`. Runtime demo data remains local so the browser
+bundle does not depend on a sibling repo fixture path. Setup log payloads contain
+only metadata such as statuses, providers, update time, and error kinds.
 
 ## Task Breakdown
 

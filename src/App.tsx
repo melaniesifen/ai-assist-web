@@ -22,6 +22,15 @@ import {
   type AssistantShellState,
   type ReviewCardViewModel
 } from "./m2-assistant-demo";
+import {
+  createFirstRunSetupViewModel,
+  createSetupDemoStates,
+  createSetupStatusCoverageFixtures,
+  getStatusCoverageLabels,
+  safeSetupLogExcludesForbiddenContent,
+  type FirstRunSetupViewModel,
+  type SetupCardViewModel
+} from "./setup-state";
 
 const EMPTY_CHAT_INPUT = "";
 
@@ -42,6 +51,8 @@ export function App(): ReactElement {
   const [reviewCards, setReviewCards] = useState<ReviewCardViewModel[]>(() => createReviewCardsFromFixtures(DEMO_REVIEW_FIXTURES));
   const [chatState, setChatState] = useState(createInitialMockChatState);
   const [chatInput, setChatInput] = useState(EMPTY_CHAT_INPUT);
+  const setupScenarios = useMemo(() => createSetupDemoStates().map(createFirstRunSetupViewModel), []);
+  const setupCoverageLabels = useMemo(() => getStatusCoverageLabels(createSetupStatusCoverageFixtures()), []);
   const contextModes = getM2ContextModeOptions();
   const approveAllState = getApproveAllState(reviewCards);
   const selectedContextMode = contextModes.find((mode) => mode.mode === "SELECTION");
@@ -100,6 +111,31 @@ export function App(): ReactElement {
             APIs. Proposed edits stay review-only until a backend-shaped apply result is mocked.
           </p>
         </article>
+
+        <section className="setup-harness" aria-label="First-run setup harness">
+          <header className="setup-header">
+            <div>
+              <p className="eyebrow">M3 first-run setup</p>
+              <h2>Backend-shaped setup states</h2>
+            </div>
+            <span className="context-pill">Default context: SELECTION</span>
+          </header>
+
+          <div className="setup-scenarios">
+            {setupScenarios.map((scenario) => (
+              <SetupScenario key={`${scenario.productSession.status}-${scenario.googleOAuth.status}`} scenario={scenario} />
+            ))}
+          </div>
+
+          <section className="setup-coverage" aria-label="M3 setup status coverage">
+            <h3>Status coverage</h3>
+            <ul>
+              {setupCoverageLabels.map((label) => (
+                <li key={label}>{label}</li>
+              ))}
+            </ul>
+          </section>
+        </section>
 
         {!shellState.panelOpen ? (
           <button
@@ -280,5 +316,72 @@ export function App(): ReactElement {
         </aside>
       ) : null}
     </main>
+  );
+}
+
+function SetupScenario({ scenario }: { scenario: FirstRunSetupViewModel }): ReactElement {
+  return (
+    <article className={`setup-scenario ${scenario.ready ? "ready" : "needs-action"}`}>
+      <header className="scenario-header">
+        <div>
+          <h3>{scenario.ready ? "Ready setup" : "Needs user action"}</h3>
+          <p>{scenario.ready ? "Login, Google, provider, and resource-session states are ready." : "Safe UI errors show what must be fixed."}</p>
+        </div>
+        <span className={`status-badge ${scenario.ready ? "ready" : "blocked"}`}>{scenario.ready ? "Ready" : "Blocked"}</span>
+      </header>
+
+      <div className="setup-card-grid">
+        <SetupCard card={scenario.productSession} />
+        <SetupCard card={scenario.googleOAuth} />
+        {scenario.providerSecrets.map((provider) => (
+          <SetupCard card={provider} key={provider.id} />
+        ))}
+        <SetupCard card={scenario.resourceSession} />
+      </div>
+
+      {scenario.errors.length > 0 ? (
+        <div className="setup-errors" role="status">
+          {scenario.errors.map((error) => (
+            <p key={`${error.kind}-${error.code ?? "unknown"}`}>
+              <strong>{error.kind}</strong>
+              {error.message}
+            </p>
+          ))}
+        </div>
+      ) : null}
+
+      <dl className="safe-log">
+        <div>
+          <dt>Safe log payload</dt>
+          <dd>{safeSetupLogExcludesForbiddenContent(scenario.safeLogEvent) ? "metadata only" : "blocked"}</dd>
+        </div>
+        <div>
+          <dt>Updated</dt>
+          <dd>{scenario.updatedAt}</dd>
+        </div>
+      </dl>
+    </article>
+  );
+}
+
+function SetupCard({ card }: { card: SetupCardViewModel }): ReactElement {
+  return (
+    <article className={`setup-card ${card.tone}`}>
+      <header>
+        <span>{card.label}</span>
+        <strong>{card.status}</strong>
+      </header>
+      <p>{card.message}</p>
+      {card.metadata.length > 0 ? (
+        <dl>
+          {card.metadata.map((item) => (
+            <div key={`${card.id}-${item.label}`}>
+              <dt>{item.label}</dt>
+              <dd>{item.value}</dd>
+            </div>
+          ))}
+        </dl>
+      ) : null}
+    </article>
   );
 }
