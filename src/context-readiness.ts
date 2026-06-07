@@ -1,33 +1,33 @@
-export const M4_CONTEXT_MODES = Object.freeze({
+export const CONTEXT_MODES = Object.freeze({
   SELECTION: "SELECTION",
   ACTIVE_RESOURCE: "ACTIVE_RESOURCE"
 } as const);
 
-export const M4_CONSENT_STATUSES = Object.freeze({
+export const CONSENT_STATUSES = Object.freeze({
   ACTIVE: "active",
   MISSING: "missing",
   REVOKED: "revoked",
   EXPIRED: "expired"
 } as const);
 
-export const M4_CONNECTOR_STATUSES = Object.freeze({
+export const CONNECTOR_STATUSES = Object.freeze({
   SUCCESS: "success",
   RETRYABLE_ERROR: "retryable_error",
   TERMINAL_ERROR: "terminal_error"
 } as const);
 
-export type M4ContextMode = (typeof M4_CONTEXT_MODES)[keyof typeof M4_CONTEXT_MODES];
-export type M4ConsentStatus = (typeof M4_CONSENT_STATUSES)[keyof typeof M4_CONSENT_STATUSES];
-export type M4ConnectorStatus = (typeof M4_CONNECTOR_STATUSES)[keyof typeof M4_CONNECTOR_STATUSES];
+export type ContextMode = (typeof CONTEXT_MODES)[keyof typeof CONTEXT_MODES];
+export type ConsentStatus = (typeof CONSENT_STATUSES)[keyof typeof CONSENT_STATUSES];
+export type ConnectorStatus = (typeof CONNECTOR_STATUSES)[keyof typeof CONNECTOR_STATUSES];
 
-export type M4ResourceRef = {
+export type ResourceRef = {
   connector: string;
   resourceId: string;
   resourceType: string;
   displayName?: string;
 };
 
-export type M4ProvenanceRef = {
+export type ProvenanceRef = {
   sourceType: string;
   trustLevel: string;
   connector: string;
@@ -37,12 +37,12 @@ export type M4ProvenanceRef = {
   connectorVerified: boolean;
 };
 
-export type M4NormalizedContextRef = {
+export type NormalizedContextRef = {
   contextId: string;
   sessionId: string;
   provider: string;
-  resourceRef: M4ResourceRef;
-  contextMode: M4ContextMode;
+  resourceRef: ResourceRef;
+  contextMode: ContextMode;
   sourceType: string;
   trustLevel: string;
   content?: string;
@@ -55,12 +55,12 @@ export type M4NormalizedContextRef = {
     originalContentLength?: number;
     truncationReason?: string;
   };
-  provenance: M4ProvenanceRef;
+  provenance: ProvenanceRef;
   capturedAt: string;
   expiresAt: string;
 };
 
-export type M4ConnectorErrorRef = {
+export type ConnectorErrorRef = {
   category: string;
   code: string;
   message?: string;
@@ -68,20 +68,20 @@ export type M4ConnectorErrorRef = {
   dependencyStatus?: string;
 };
 
-export type M4ConnectorResponseRef = {
+export type ConnectorResponseRef = {
   connector: string;
   operation: string;
-  status: M4ConnectorStatus;
+  status: ConnectorStatus;
   requestId: string;
   resourceRevision?: string;
   result?: {
-    context?: M4NormalizedContextRef;
+    context?: NormalizedContextRef;
     resourceRevision?: string;
   };
-  error?: M4ConnectorErrorRef;
+  error?: ConnectorErrorRef;
 };
 
-export type M4ContractErrorRef = {
+export type ContractErrorRef = {
   code: string;
   category: string;
   message?: string;
@@ -89,57 +89,57 @@ export type M4ContractErrorRef = {
   target?: string;
 };
 
-export type M4GoogleOAuthStatusRef = {
+export type GoogleOAuthStatusRef = {
   provider: "google";
   status: "connected" | "reconnect_required" | "not_connected";
   googleAccountId?: string;
-  error?: M4ContractErrorRef;
+  error?: ContractErrorRef;
 };
 
-export type M4ReadinessInput = {
+export type ContextReadinessInput = {
   id: string;
   title: string;
-  contextMode: M4ContextMode;
-  consentStatus: M4ConsentStatus;
-  connectorResponse?: M4ConnectorResponseRef;
-  consentError?: M4ContractErrorRef;
-  googleOAuth?: M4GoogleOAuthStatusRef;
+  contextMode: ContextMode;
+  consentStatus: ConsentStatus;
+  connectorResponse?: ConnectorResponseRef;
+  consentError?: ContractErrorRef;
+  googleOAuth?: GoogleOAuthStatusRef;
 };
 
-export type M4MetadataItem = {
+export type MetadataItem = {
   label: string;
   value: string;
 };
 
-export type M4ReadinessTone = "ready" | "blocked" | "warning";
+export type ContextReadinessTone = "ready" | "blocked" | "warning";
 
-export type M4SafeLogEvent = {
-  eventName: "m4_read_path_state_rendered";
+export type ContextReadinessLogEvent = {
+  eventName: "google_docs_read_path_state_rendered";
   scenarioId: string;
-  contextMode: M4ContextMode;
-  consentStatus: M4ConsentStatus;
-  connectorStatus: M4ConnectorStatus | "not_called";
+  contextMode: ContextMode;
+  consentStatus: ConsentStatus;
+  connectorStatus: ConnectorStatus | "not_called";
   failureCode: string | null;
   provenanceTrustLevel: string | null;
   truncated: boolean | null;
 };
 
-export type M4ReadinessViewModel = {
+export type GoogleDocsReadinessViewModel = {
   id: string;
   title: string;
-  tone: M4ReadinessTone;
-  contextMode: M4ContextMode;
+  tone: ContextReadinessTone;
+  contextMode: ContextMode;
   contextLabel: string;
   statusLabel: string;
   consentLabel: string;
   consentMessage: string;
   userMessage: string;
-  metadata: readonly M4MetadataItem[];
+  metadata: readonly MetadataItem[];
   failure: {
     code: string;
     message: string;
   } | null;
-  safeLogEvent: M4SafeLogEvent;
+  safeLogEvent: ContextReadinessLogEvent;
 };
 
 const SAFE_FAILURE_MESSAGES: Readonly<Record<string, string>> = Object.freeze({
@@ -185,7 +185,7 @@ function formatStatus(status: string): string {
   return status.replaceAll("_", " ").replace(/^\w/, (letter) => letter.toUpperCase());
 }
 
-function metadata(label: string, value: string | number | boolean | undefined): M4MetadataItem | null {
+function metadata(label: string, value: string | number | boolean | undefined): MetadataItem | null {
   if (value === undefined || value === "") {
     return null;
   }
@@ -193,17 +193,17 @@ function metadata(label: string, value: string | number | boolean | undefined): 
   return { label, value: String(value) };
 }
 
-function compactMetadata(items: readonly (M4MetadataItem | null)[]): M4MetadataItem[] {
-  return items.filter((item): item is M4MetadataItem => item !== null);
+function compactMetadata(items: readonly (MetadataItem | null)[]): MetadataItem[] {
+  return items.filter((item): item is MetadataItem => item !== null);
 }
 
-export function createM4ReadinessViewModel(input: M4ReadinessInput): M4ReadinessViewModel {
+export function createGoogleDocsReadinessViewModel(input: ContextReadinessInput): GoogleDocsReadinessViewModel {
   const context = input.connectorResponse?.result?.context;
   const failureCode = getFailureCode(input);
   const connectorStatus = input.connectorResponse?.status ?? "not_called";
-  const hasConsent = input.consentStatus === M4_CONSENT_STATUSES.ACTIVE;
-  const ready = hasConsent && connectorStatus === M4_CONNECTOR_STATUSES.SUCCESS && context !== undefined;
-  const tone = ready ? "ready" : connectorStatus === M4_CONNECTOR_STATUSES.RETRYABLE_ERROR ? "warning" : "blocked";
+  const hasConsent = input.consentStatus === CONSENT_STATUSES.ACTIVE;
+  const ready = hasConsent && connectorStatus === CONNECTOR_STATUSES.SUCCESS && context !== undefined;
+  const tone = ready ? "ready" : connectorStatus === CONNECTOR_STATUSES.RETRYABLE_ERROR ? "warning" : "blocked";
   const failure = failureCode === null ? null : { code: failureCode, message: getSafeFailureMessage(failureCode) };
 
   return {
@@ -219,7 +219,7 @@ export function createM4ReadinessViewModel(input: M4ReadinessInput): M4Readiness
     metadata: context === undefined ? [] : createContextMetadata(context),
     failure,
     safeLogEvent: {
-      eventName: "m4_read_path_state_rendered",
+      eventName: "google_docs_read_path_state_rendered",
       scenarioId: input.id,
       contextMode: input.contextMode,
       consentStatus: input.consentStatus,
@@ -231,7 +231,7 @@ export function createM4ReadinessViewModel(input: M4ReadinessInput): M4Readiness
   };
 }
 
-function createContextMetadata(context: M4NormalizedContextRef): readonly M4MetadataItem[] {
+function createContextMetadata(context: NormalizedContextRef): readonly MetadataItem[] {
   return compactMetadata([
     metadata("Resource", context.resourceRef.displayName ?? context.resourceRef.resourceId),
     metadata("Content hash", context.contentHash),
@@ -247,12 +247,12 @@ function createContextMetadata(context: M4NormalizedContextRef): readonly M4Meta
   ]);
 }
 
-function getFailureCode(input: M4ReadinessInput): string | null {
+function getFailureCode(input: ContextReadinessInput): string | null {
   if (input.googleOAuth?.status === "reconnect_required") {
     return input.googleOAuth.error?.code ?? "OAUTH_RECONNECT_REQUIRED";
   }
 
-  if (input.consentStatus !== M4_CONSENT_STATUSES.ACTIVE) {
+  if (input.consentStatus !== CONSENT_STATUSES.ACTIVE) {
     return input.consentError?.code ?? "CONSENT_REQUIRED";
   }
 
@@ -263,17 +263,17 @@ function getSafeFailureMessage(code: string): string {
   return SAFE_FAILURE_MESSAGES[code] ?? "Read context is unavailable. Try again later.";
 }
 
-function getContextLabel(contextMode: M4ContextMode): string {
-  return contextMode === M4_CONTEXT_MODES.ACTIVE_RESOURCE ? "Active resource" : "Selection";
+function getContextLabel(contextMode: ContextMode): string {
+  return contextMode === CONTEXT_MODES.ACTIVE_RESOURCE ? "Active resource" : "Selection";
 }
 
-function getConsentMessage(consentStatus: M4ConsentStatus): string {
+function getConsentMessage(consentStatus: ConsentStatus): string {
   switch (consentStatus) {
-    case M4_CONSENT_STATUSES.ACTIVE:
+    case CONSENT_STATUSES.ACTIVE:
       return "Consent is active for this Google Docs context mode.";
-    case M4_CONSENT_STATUSES.REVOKED:
+    case CONSENT_STATUSES.REVOKED:
       return "Consent was revoked before context capture.";
-    case M4_CONSENT_STATUSES.EXPIRED:
+    case CONSENT_STATUSES.EXPIRED:
       return "Consent expired before context capture.";
     default:
       return "Consent is required before context capture.";
@@ -286,8 +286,8 @@ function getUserMessage({
   failure
 }: {
   ready: boolean;
-  input: M4ReadinessInput;
-  failure: M4ReadinessViewModel["failure"];
+  input: ContextReadinessInput;
+  failure: GoogleDocsReadinessViewModel["failure"];
 }): string {
   if (ready) {
     return `${getContextLabel(input.contextMode)} read path is ready with metadata-only context display.`;
@@ -300,19 +300,19 @@ function getUserMessage({
   return "Read context is blocked until backend readiness checks pass.";
 }
 
-export function createM4DemoReadinessStates(): readonly M4ReadinessInput[] {
+export function createGoogleDocsReadinessDemoStates(): readonly ContextReadinessInput[] {
   return Object.freeze([
     {
       id: "selection-ready",
       title: "Selection context ready",
-      contextMode: M4_CONTEXT_MODES.SELECTION,
-      consentStatus: M4_CONSENT_STATUSES.ACTIVE,
+      contextMode: CONTEXT_MODES.SELECTION,
+      consentStatus: CONSENT_STATUSES.ACTIVE,
       connectorResponse: createDemoConnectorResponse({
         context: createDemoContext({
-          contextId: "ctx_m4_selection",
-          contextMode: M4_CONTEXT_MODES.SELECTION,
+          contextId: "ctx_google_docs_selection",
+          contextMode: CONTEXT_MODES.SELECTION,
           sourceType: "connector_selection",
-          contentHash: "sha256:m4-selection",
+          contentHash: "sha256:google-docs-selection",
           contentLength: 24,
           truncated: false
         })
@@ -321,14 +321,14 @@ export function createM4DemoReadinessStates(): readonly M4ReadinessInput[] {
     {
       id: "active-resource-ready",
       title: "Active resource ready",
-      contextMode: M4_CONTEXT_MODES.ACTIVE_RESOURCE,
-      consentStatus: M4_CONSENT_STATUSES.ACTIVE,
+      contextMode: CONTEXT_MODES.ACTIVE_RESOURCE,
+      consentStatus: CONSENT_STATUSES.ACTIVE,
       connectorResponse: createDemoConnectorResponse({
         context: createDemoContext({
-          contextId: "ctx_m4_active_resource",
-          contextMode: M4_CONTEXT_MODES.ACTIVE_RESOURCE,
+          contextId: "ctx_google_docs_active_resource",
+          contextMode: CONTEXT_MODES.ACTIVE_RESOURCE,
           sourceType: "connector_resource_excerpt",
-          contentHash: "sha256:m4-active-resource",
+          contentHash: "sha256:google-docs-active-resource",
           contentLength: 4200,
           truncated: false
         })
@@ -337,14 +337,14 @@ export function createM4DemoReadinessStates(): readonly M4ReadinessInput[] {
     {
       id: "active-resource-truncated",
       title: "Active resource truncated",
-      contextMode: M4_CONTEXT_MODES.ACTIVE_RESOURCE,
-      consentStatus: M4_CONSENT_STATUSES.ACTIVE,
+      contextMode: CONTEXT_MODES.ACTIVE_RESOURCE,
+      consentStatus: CONSENT_STATUSES.ACTIVE,
       connectorResponse: createDemoConnectorResponse({
         context: createDemoContext({
-          contextId: "ctx_m4_truncated",
-          contextMode: M4_CONTEXT_MODES.ACTIVE_RESOURCE,
+          contextId: "ctx_google_docs_truncated",
+          contextMode: CONTEXT_MODES.ACTIVE_RESOURCE,
           sourceType: "connector_resource_excerpt",
-          contentHash: "sha256:m4-truncated",
+          contentHash: "sha256:google-docs-truncated",
           contentLength: 6000,
           originalContentLength: 18000,
           truncated: true,
@@ -355,8 +355,8 @@ export function createM4DemoReadinessStates(): readonly M4ReadinessInput[] {
     {
       id: "missing-consent",
       title: "Missing consent",
-      contextMode: M4_CONTEXT_MODES.ACTIVE_RESOURCE,
-      consentStatus: M4_CONSENT_STATUSES.MISSING,
+      contextMode: CONTEXT_MODES.ACTIVE_RESOURCE,
+      consentStatus: CONSENT_STATUSES.MISSING,
       consentError: {
         code: "CONSENT_REQUIRED",
         category: "CONSENT_REQUIRED",
@@ -366,8 +366,8 @@ export function createM4DemoReadinessStates(): readonly M4ReadinessInput[] {
     {
       id: "revoked-consent",
       title: "Revoked consent",
-      contextMode: M4_CONTEXT_MODES.SELECTION,
-      consentStatus: M4_CONSENT_STATUSES.REVOKED,
+      contextMode: CONTEXT_MODES.SELECTION,
+      consentStatus: CONSENT_STATUSES.REVOKED,
       consentError: {
         code: "CONSENT_REQUIRED",
         category: "CONSENT_REQUIRED",
@@ -377,8 +377,8 @@ export function createM4DemoReadinessStates(): readonly M4ReadinessInput[] {
     {
       id: "expired-consent",
       title: "Expired consent",
-      contextMode: M4_CONTEXT_MODES.ACTIVE_RESOURCE,
-      consentStatus: M4_CONSENT_STATUSES.EXPIRED,
+      contextMode: CONTEXT_MODES.ACTIVE_RESOURCE,
+      consentStatus: CONSENT_STATUSES.EXPIRED,
       consentError: {
         code: "CONSENT_REQUIRED",
         category: "CONSENT_REQUIRED",
@@ -388,12 +388,12 @@ export function createM4DemoReadinessStates(): readonly M4ReadinessInput[] {
     {
       id: "reconnect-required",
       title: "Reconnect required",
-      contextMode: M4_CONTEXT_MODES.ACTIVE_RESOURCE,
-      consentStatus: M4_CONSENT_STATUSES.ACTIVE,
+      contextMode: CONTEXT_MODES.ACTIVE_RESOURCE,
+      consentStatus: CONSENT_STATUSES.ACTIVE,
       googleOAuth: {
         provider: "google",
         status: "reconnect_required",
-        googleAccountId: "google_account_m4_demo",
+        googleAccountId: "google_account_read_path_demo",
         error: {
           code: "OAUTH_RECONNECT_REQUIRED",
           category: "OAUTH",
@@ -404,13 +404,13 @@ export function createM4DemoReadinessStates(): readonly M4ReadinessInput[] {
     {
       id: "permission-failure",
       title: "Permission failure",
-      contextMode: M4_CONTEXT_MODES.ACTIVE_RESOURCE,
-      consentStatus: M4_CONSENT_STATUSES.ACTIVE,
+      contextMode: CONTEXT_MODES.ACTIVE_RESOURCE,
+      consentStatus: CONSENT_STATUSES.ACTIVE,
       connectorResponse: {
         connector: "google_docs",
         operation: "ReadContext",
-        status: M4_CONNECTOR_STATUSES.TERMINAL_ERROR,
-        requestId: "req_m4_permission",
+        status: CONNECTOR_STATUSES.TERMINAL_ERROR,
+        requestId: "req_google_docs_permission",
         error: {
           category: "authorization",
           code: "GOOGLE_DOCS_READ_PERMISSION_DENIED"
@@ -420,11 +420,11 @@ export function createM4DemoReadinessStates(): readonly M4ReadinessInput[] {
   ]);
 }
 
-function createDemoConnectorResponse({ context }: { context: M4NormalizedContextRef }): M4ConnectorResponseRef {
+function createDemoConnectorResponse({ context }: { context: NormalizedContextRef }): ConnectorResponseRef {
   return {
     connector: "google_docs",
     operation: "ReadContext",
-    status: M4_CONNECTOR_STATUSES.SUCCESS,
+    status: CONNECTOR_STATUSES.SUCCESS,
     requestId: `req_${context.contextId}`,
     resourceRevision: context.resourceRevision,
     result: {
@@ -445,26 +445,26 @@ function createDemoContext({
   truncationReason
 }: {
   contextId: string;
-  contextMode: M4ContextMode;
+  contextMode: ContextMode;
   sourceType: string;
   contentHash: string;
   contentLength: number;
   originalContentLength?: number;
   truncated: boolean;
   truncationReason?: string;
-}): M4NormalizedContextRef {
-  const resourceRevision = "rev_m4_demo";
-  const resourceId = "gdoc_m4_demo";
+}): NormalizedContextRef {
+  const resourceRevision = "rev_google_docs_demo";
+  const resourceId = "gdoc_read_path_demo";
 
   return {
     contextId,
-    sessionId: "session_m4_demo",
+    sessionId: "session_read_path_demo",
     provider: "google_docs",
     resourceRef: {
       connector: "google_docs",
       resourceId,
       resourceType: "document",
-      displayName: "M4 readiness fixture document"
+      displayName: "Google Docs readiness fixture document"
     },
     contextMode,
     sourceType,
@@ -492,11 +492,11 @@ function createDemoContext({
   };
 }
 
-export function createM4SafeLogEvent(input: M4ReadinessInput): M4SafeLogEvent {
-  return createM4ReadinessViewModel(input).safeLogEvent;
+export function createContextReadinessLogEvent(input: ContextReadinessInput): ContextReadinessLogEvent {
+  return createGoogleDocsReadinessViewModel(input).safeLogEvent;
 }
 
-export function safeM4LogExcludesForbiddenContent(event: M4SafeLogEvent): boolean {
+export function safeContextReadinessLogExcludesForbiddenContent(event: ContextReadinessLogEvent): boolean {
   return keyAndValueAreSafe("event", event);
 }
 

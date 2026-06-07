@@ -1,24 +1,24 @@
 import { describe, expect, it } from "vitest";
 import {
-  M4_CONNECTOR_STATUSES,
-  M4_CONSENT_STATUSES,
-  M4_CONTEXT_MODES,
-  createM4DemoReadinessStates,
-  createM4ReadinessViewModel,
-  createM4SafeLogEvent,
-  safeM4LogExcludesForbiddenContent,
-  type M4ConnectorResponseRef,
-  type M4ContractErrorRef,
-  type M4GoogleOAuthStatusRef,
-  type M4NormalizedContextRef,
-  type M4ReadinessInput
-} from "../src/m4-readiness";
+  CONNECTOR_STATUSES,
+  CONSENT_STATUSES,
+  CONTEXT_MODES,
+  createGoogleDocsReadinessDemoStates,
+  createGoogleDocsReadinessViewModel,
+  createContextReadinessLogEvent,
+  safeContextReadinessLogExcludesForbiddenContent,
+  type ConnectorResponseRef,
+  type ContractErrorRef,
+  type GoogleOAuthStatusRef,
+  type NormalizedContextRef,
+  type ContextReadinessInput
+} from "../src/context-readiness";
 
 async function loadM4ContractFixtures(): Promise<{
-  consentErrorFixtures: readonly { value: M4ContractErrorRef }[];
-  googleOAuthReconnectRequiredFixture: { value: M4GoogleOAuthStatusRef };
-  googleDocsReadPathConnectorFixtures: readonly { name: string; value: M4ConnectorResponseRef }[];
-  normalizedContextFixtures: readonly { value: M4NormalizedContextRef }[];
+  consentErrorFixtures: readonly { value: ContractErrorRef }[];
+  googleOAuthReconnectRequiredFixture: { value: GoogleOAuthStatusRef };
+  googleDocsReadPathConnectorFixtures: readonly { name: string; value: ConnectorResponseRef }[];
+  normalizedContextFixtures: readonly { value: NormalizedContextRef }[];
   validateConnectorResponse: (value: unknown) => { valid: boolean; issues: readonly unknown[] };
   validateNormalizedContext: (value: unknown) => { valid: boolean; issues: readonly unknown[] };
 }> {
@@ -69,25 +69,25 @@ describe("M4 Google Docs read-path readiness", () => {
     expect(validateConnectorResponse(truncatedResponse)).toMatchObject({ valid: true, issues: [] });
     expect(validateNormalizedContext(normalizedContextFixtures[0].value)).toMatchObject({ valid: true, issues: [] });
 
-    const selection = createM4ReadinessViewModel({
+    const selection = createGoogleDocsReadinessViewModel({
       id: "selection-contract",
       title: "Selection contract",
-      contextMode: M4_CONTEXT_MODES.SELECTION,
-      consentStatus: M4_CONSENT_STATUSES.ACTIVE,
+      contextMode: CONTEXT_MODES.SELECTION,
+      consentStatus: CONSENT_STATUSES.ACTIVE,
       connectorResponse: selectionResponse
     });
-    const activeResource = createM4ReadinessViewModel({
+    const activeResource = createGoogleDocsReadinessViewModel({
       id: "active-resource-contract",
       title: "Active resource contract",
-      contextMode: M4_CONTEXT_MODES.ACTIVE_RESOURCE,
-      consentStatus: M4_CONSENT_STATUSES.ACTIVE,
+      contextMode: CONTEXT_MODES.ACTIVE_RESOURCE,
+      consentStatus: CONSENT_STATUSES.ACTIVE,
       connectorResponse: activeResourceResponse
     });
-    const truncated = createM4ReadinessViewModel({
+    const truncated = createGoogleDocsReadinessViewModel({
       id: "truncated-contract",
       title: "Truncated contract",
-      contextMode: M4_CONTEXT_MODES.ACTIVE_RESOURCE,
-      consentStatus: M4_CONSENT_STATUSES.ACTIVE,
+      contextMode: CONTEXT_MODES.ACTIVE_RESOURCE,
+      consentStatus: CONSENT_STATUSES.ACTIVE,
       connectorResponse: truncatedResponse
     });
 
@@ -122,36 +122,36 @@ describe("M4 Google Docs read-path readiness", () => {
   it("renders active, missing, revoked, and expired consent states before connector calls", async () => {
     const { consentErrorFixtures } = await loadM4ContractFixtures();
     const [missing, revoked, expired] = consentErrorFixtures;
-    const inputs: readonly M4ReadinessInput[] = [
+    const inputs: readonly ContextReadinessInput[] = [
       {
         id: "active-consent",
         title: "Active consent",
-        contextMode: M4_CONTEXT_MODES.SELECTION,
-        consentStatus: M4_CONSENT_STATUSES.ACTIVE
+        contextMode: CONTEXT_MODES.SELECTION,
+        consentStatus: CONSENT_STATUSES.ACTIVE
       },
       {
         id: "missing-consent",
         title: "Missing consent",
-        contextMode: M4_CONTEXT_MODES.ACTIVE_RESOURCE,
-        consentStatus: M4_CONSENT_STATUSES.MISSING,
+        contextMode: CONTEXT_MODES.ACTIVE_RESOURCE,
+        consentStatus: CONSENT_STATUSES.MISSING,
         consentError: missing.value
       },
       {
         id: "revoked-consent",
         title: "Revoked consent",
-        contextMode: M4_CONTEXT_MODES.SELECTION,
-        consentStatus: M4_CONSENT_STATUSES.REVOKED,
+        contextMode: CONTEXT_MODES.SELECTION,
+        consentStatus: CONSENT_STATUSES.REVOKED,
         consentError: revoked.value
       },
       {
         id: "expired-consent",
         title: "Expired consent",
-        contextMode: M4_CONTEXT_MODES.ACTIVE_RESOURCE,
-        consentStatus: M4_CONSENT_STATUSES.EXPIRED,
+        contextMode: CONTEXT_MODES.ACTIVE_RESOURCE,
+        consentStatus: CONSENT_STATUSES.EXPIRED,
         consentError: expired.value
       }
     ];
-    const viewModels = inputs.map(createM4ReadinessViewModel);
+    const viewModels = inputs.map(createGoogleDocsReadinessViewModel);
 
     expect(viewModels.map((viewModel) => viewModel.consentLabel)).toEqual(["Active", "Missing", "Revoked", "Expired"]);
     expect(viewModels[1].failure?.message).toBe("Grant access to this Google Doc before reading context.");
@@ -168,18 +168,18 @@ describe("M4 Google Docs read-path readiness", () => {
 
     expect(permissionResponse).toBeDefined();
 
-    const reconnect = createM4ReadinessViewModel({
+    const reconnect = createGoogleDocsReadinessViewModel({
       id: "reconnect-contract",
       title: "Reconnect contract",
-      contextMode: M4_CONTEXT_MODES.ACTIVE_RESOURCE,
-      consentStatus: M4_CONSENT_STATUSES.ACTIVE,
+      contextMode: CONTEXT_MODES.ACTIVE_RESOURCE,
+      consentStatus: CONSENT_STATUSES.ACTIVE,
       googleOAuth: googleOAuthReconnectRequiredFixture.value
     });
-    const permission = createM4ReadinessViewModel({
+    const permission = createGoogleDocsReadinessViewModel({
       id: "permission-contract",
       title: "Permission contract",
-      contextMode: M4_CONTEXT_MODES.ACTIVE_RESOURCE,
-      consentStatus: M4_CONSENT_STATUSES.ACTIVE,
+      contextMode: CONTEXT_MODES.ACTIVE_RESOURCE,
+      consentStatus: CONSENT_STATUSES.ACTIVE,
       connectorResponse: permissionResponse
     });
 
@@ -193,20 +193,20 @@ describe("M4 Google Docs read-path readiness", () => {
   });
 
   it("keeps M4 safe log events metadata-only and detects unsafe fields or values", () => {
-    const readyInput = createM4DemoReadinessStates()[0];
-    const event = createM4SafeLogEvent(readyInput);
+    const readyInput = createGoogleDocsReadinessDemoStates()[0];
+    const event = createContextReadinessLogEvent(readyInput);
 
-    expect(safeM4LogExcludesForbiddenContent(event)).toBe(true);
+    expect(safeContextReadinessLogExcludesForbiddenContent(event)).toBe(true);
     expect(JSON.stringify(event)).not.toMatch(/document text|selected text|prompt|model response|authorization|oauth/i);
     expect(
-      safeM4LogExcludesForbiddenContent({
+      safeContextReadinessLogExcludesForbiddenContent({
         ...event,
         // @ts-expect-error - negative coverage for unsafe dynamic fields from future caller mistakes.
         documentText: "raw document text"
       })
     ).toBe(false);
     expect(
-      safeM4LogExcludesForbiddenContent({
+      safeContextReadinessLogExcludesForbiddenContent({
         ...event,
         failureCode: "prompt: raw document selected text model response"
       })
@@ -214,7 +214,7 @@ describe("M4 Google Docs read-path readiness", () => {
   });
 
   it("renders local demo coverage for required M4 read-path state families", () => {
-    const viewModels = createM4DemoReadinessStates().map(createM4ReadinessViewModel);
+    const viewModels = createGoogleDocsReadinessDemoStates().map(createGoogleDocsReadinessViewModel);
 
     expect(viewModels.map((viewModel) => viewModel.id)).toEqual([
       "selection-ready",
@@ -227,12 +227,12 @@ describe("M4 Google Docs read-path readiness", () => {
       "permission-failure"
     ]);
     expect(viewModels.filter((viewModel) => viewModel.tone === "ready")).toHaveLength(3);
-    expect(viewModels.find((viewModel) => viewModel.id === "selection-ready")?.contextMode).toBe(M4_CONTEXT_MODES.SELECTION);
+    expect(viewModels.find((viewModel) => viewModel.id === "selection-ready")?.contextMode).toBe(CONTEXT_MODES.SELECTION);
     expect(viewModels.find((viewModel) => viewModel.id === "active-resource-ready")?.contextMode).toBe(
-      M4_CONTEXT_MODES.ACTIVE_RESOURCE
+      CONTEXT_MODES.ACTIVE_RESOURCE
     );
     expect(viewModels.find((viewModel) => viewModel.id === "permission-failure")?.safeLogEvent.connectorStatus).toBe(
-      M4_CONNECTOR_STATUSES.TERMINAL_ERROR
+      CONNECTOR_STATUSES.TERMINAL_ERROR
     );
   });
 });

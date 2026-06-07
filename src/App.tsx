@@ -32,11 +32,11 @@ import {
   type SetupCardViewModel
 } from "./setup-state";
 import {
-  createM4DemoReadinessStates,
-  createM4ReadinessViewModel,
-  safeM4LogExcludesForbiddenContent,
-  type M4ReadinessViewModel
-} from "./m4-readiness";
+  createGoogleDocsReadinessDemoStates,
+  createGoogleDocsReadinessViewModel,
+  safeContextReadinessLogExcludesForbiddenContent,
+  type GoogleDocsReadinessViewModel
+} from "./context-readiness";
 
 const EMPTY_CHAT_INPUT = "";
 
@@ -59,7 +59,10 @@ export function App(): ReactElement {
   const [chatInput, setChatInput] = useState(EMPTY_CHAT_INPUT);
   const setupScenarios = useMemo(() => createSetupDemoStates().map(createFirstRunSetupViewModel), []);
   const setupCoverageLabels = useMemo(() => getStatusCoverageLabels(createSetupStatusCoverageFixtures()), []);
-  const m4ReadinessScenarios = useMemo(() => createM4DemoReadinessStates().map(createM4ReadinessViewModel), []);
+  const readPathReadinessScenarios = useMemo(
+    () => createGoogleDocsReadinessDemoStates().map(createGoogleDocsReadinessViewModel),
+    []
+  );
   const contextModes = getM2ContextModeOptions();
   const approveAllState = getApproveAllState(reviewCards);
   const selectedContextMode = contextModes.find((mode) => mode.mode === "SELECTION");
@@ -144,7 +147,7 @@ export function App(): ReactElement {
           </section>
         </section>
 
-        <section className="m4-readiness-harness" aria-label="M4 Google Docs read-path readiness">
+        <section className="context-readiness-harness" aria-label="M4 Google Docs read-path readiness">
           <header className="setup-header">
             <div>
               <p className="eyebrow">M4 Google Docs read path</p>
@@ -154,7 +157,7 @@ export function App(): ReactElement {
           </header>
 
           <div className="readiness-grid">
-            {m4ReadinessScenarios.map((scenario) => (
+            {readPathReadinessScenarios.map((scenario) => (
               <ReadinessScenario key={scenario.id} scenario={scenario} />
             ))}
           </div>
@@ -342,7 +345,7 @@ export function App(): ReactElement {
   );
 }
 
-function ReadinessScenario({ scenario }: { scenario: M4ReadinessViewModel }): ReactElement {
+function ReadinessScenario({ scenario }: { scenario: GoogleDocsReadinessViewModel }): ReactElement {
   return (
     <article className={`readiness-card ${scenario.tone}`}>
       <header className="readiness-header">
@@ -362,7 +365,7 @@ function ReadinessScenario({ scenario }: { scenario: M4ReadinessViewModel }): Re
         </div>
         <div>
           <dt>Safe log</dt>
-          <dd>{safeM4LogExcludesForbiddenContent(scenario.safeLogEvent) ? "metadata only" : "blocked"}</dd>
+          <dd>{safeContextReadinessLogExcludesForbiddenContent(scenario.safeLogEvent) ? "metadata only" : "blocked"}</dd>
         </div>
       </dl>
 

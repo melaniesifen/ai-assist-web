@@ -137,7 +137,7 @@ code {
 }
 
 .setup-harness,
-.m4-readiness-harness {
+.context-readiness-harness {
   display: grid;
   gap: 14px;
   width: min(860px, 100%);

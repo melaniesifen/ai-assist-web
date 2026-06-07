@@ -19,7 +19,7 @@ safe-error behavior in pure TypeScript helpers with unit tests.
 - `src/setup-state.ts`: M3 first-run setup state mapping for product session,
   Google OAuth, provider-secret readiness, resource-session readiness, safe
   setup errors, and metadata-only setup log events.
-- `src/m4-readiness.ts`: M4 Google Docs read-path readiness state mapping for
+- `src/context-readiness.ts`: Google Docs read-path readiness state mapping for
   `SELECTION`, `ACTIVE_RESOURCE`, consent states, normalized context metadata,
   reconnect-required, permission failures, and metadata-only client log events.
 - `src/session-events.ts`: reducer for SSE-style session events.
@@ -122,7 +122,7 @@ through `src/setup-state.ts`. Runtime demo data remains local so the browser
 bundle does not depend on a sibling repo fixture path. Setup log payloads contain
 only metadata such as statuses, providers, update time, and error kinds.
 
-## M4 Read-Path Readiness Harness
+## Google Docs Read-Path Readiness Harness
 
 The local app renders Google Docs read-path readiness states for `SELECTION` and
 `ACTIVE_RESOURCE`. It shows active, missing, revoked, and expired consent,
@@ -134,7 +134,7 @@ render raw document text or selected text in the readiness cards, and its safe
 log event contains only scenario ID, mode, consent status, connector status,
 failure code, provenance trust level, and truncation status.
 
-Tests import the real M4 Google Docs read-path fixtures from
+Tests import the real Google Docs read-path fixtures from
 `ai-assist-contracts` and validate the web mapper against the shared connector
 and normalized-context shapes.
 
