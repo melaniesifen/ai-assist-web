@@ -37,6 +37,14 @@ import {
   safeContextReadinessLogExcludesForbiddenContent,
   type GoogleDocsReadinessViewModel
 } from "./context-readiness";
+import {
+  createAcceptedCommandView,
+  createInitialSessionStreamClientState,
+  createLastEventIdHeaders,
+  createSessionStreamDemoFrames,
+  reduceSseFrame,
+  safeSessionStreamLogExcludesForbiddenContent
+} from "./session-stream";
 
 const EMPTY_CHAT_INPUT = "";
 
@@ -57,16 +65,20 @@ export function App(): ReactElement {
   const [reviewCards, setReviewCards] = useState<ReviewCardViewModel[]>(() => createReviewCardsFromFixtures(DEMO_REVIEW_FIXTURES));
   const [chatState, setChatState] = useState(createInitialMockChatState);
   const [chatInput, setChatInput] = useState(EMPTY_CHAT_INPUT);
+  const [sessionStreamState, setSessionStreamState] = useState(createInitialSessionStreamClientState);
   const setupScenarios = useMemo(() => createSetupDemoStates().map(createFirstRunSetupViewModel), []);
   const setupCoverageLabels = useMemo(() => getStatusCoverageLabels(createSetupStatusCoverageFixtures()), []);
   const readPathReadinessScenarios = useMemo(
     () => createGoogleDocsReadinessDemoStates().map(createGoogleDocsReadinessViewModel),
     []
   );
+  const sessionStreamFrames = useMemo(createSessionStreamDemoFrames, []);
+  const acceptedCommand = useMemo(createAcceptedCommandView, []);
   const contextModes = getM2ContextModeOptions();
   const approveAllState = getApproveAllState(reviewCards);
   const selectedContextMode = contextModes.find((mode) => mode.mode === "SELECTION");
   const activeResourceMode = contextModes.find((mode) => mode.mode === "ACTIVE_RESOURCE");
+  const lastEventHeaders = createLastEventIdHeaders(sessionStreamState.lastEventId);
   const latestCommand = reviewCards.reduce<ReviewCardViewModel["lastCommand"]>(
     (command, card) => card.lastCommand ?? command,
     null
@@ -79,6 +91,10 @@ export function App(): ReactElement {
   function submitChat(): void {
     setChatState((state) => submitMockChatMessage(state, chatInput));
     setChatInput(EMPTY_CHAT_INPUT);
+  }
+
+  function runSessionStreamDemo(): void {
+    setSessionStreamState(sessionStreamFrames.reduce(reduceSseFrame, createInitialSessionStreamClientState()));
   }
 
   function closePanel(): void {
@@ -160,6 +176,116 @@ export function App(): ReactElement {
             {readPathReadinessScenarios.map((scenario) => (
               <ReadinessScenario key={scenario.id} scenario={scenario} />
             ))}
+          </div>
+        </section>
+
+        <section className="session-stream-harness" aria-label="Session stream harness">
+          <header className="setup-header">
+            <div>
+              <p className="eyebrow">Ask and stream</p>
+              <h2>Command and SSE session events</h2>
+            </div>
+            <button className="primary" onClick={runSessionStreamDemo} type="button">
+              Run stream
+            </button>
+          </header>
+
+          <div className="stream-grid">
+            <article className="stream-card">
+              <h3>Accepted command</h3>
+              <dl className="stream-metadata">
+                {Object.entries(acceptedCommand).map(([label, value]) => (
+                  <div key={label}>
+                    <dt>{label}</dt>
+                    <dd>{value}</dd>
+                  </div>
+                ))}
+              </dl>
+            </article>
+
+            <article className="stream-card">
+              <h3>Session stream</h3>
+              <dl className="stream-metadata">
+                <div>
+                  <dt>Connection</dt>
+                  <dd>{sessionStreamState.session.connection}</dd>
+                </div>
+                <div>
+                  <dt>Last event</dt>
+                  <dd>{sessionStreamState.lastEventId ?? "None"}</dd>
+                </div>
+                <div>
+                  <dt>Reconnect</dt>
+                  <dd>{sessionStreamState.reconnectRequired ? "Required" : "Not required"}</dd>
+                </div>
+                <div>
+                  <dt>Last-Event-ID</dt>
+                  <dd>{lastEventHeaders["Last-Event-ID"] ?? "None"}</dd>
+                </div>
+              </dl>
+            </article>
+          </div>
+
+          <div className="stream-grid">
+            <article className="stream-card">
+              <h3>Progress</h3>
+              {sessionStreamState.session.progress.length === 0 ? (
+                <p className="empty-state">No streamed progress yet.</p>
+              ) : (
+                <ul className="stream-list">
+                  {sessionStreamState.session.progress.map((progress) => (
+                    <li key={progress.eventId ?? progress.message}>{progress.message}</li>
+                  ))}
+                </ul>
+              )}
+            </article>
+
+            <article className="stream-card">
+              <h3>Assistant output</h3>
+              {sessionStreamState.session.messages.length === 0 ? (
+                <p className="empty-state">Run the stream to accumulate assistant deltas.</p>
+              ) : (
+                sessionStreamState.session.messages.map((message) => (
+                  <p className={`message ${message.role}`} key={message.messageId}>
+                    <span>{message.status}</span>
+                    {message.content}
+                  </p>
+                ))
+              )}
+            </article>
+          </div>
+
+          <div className="stream-grid">
+            <article className="stream-card warning">
+              <h3>Warnings and errors</h3>
+              <p className="empty-state">Malformed frames: {sessionStreamState.malformedFrameCount}</p>
+              {sessionStreamState.session.streamWarnings.map((warning) => (
+                <p className="stream-warning" key={`${warning.kind}-${warning.eventId ?? "none"}`}>
+                  <strong>{warning.kind}</strong>
+                  {warning.message}
+                </p>
+              ))}
+              {sessionStreamState.session.errors.map((error) => (
+                <p className="stream-error" key={`${error.category}-${error.code}`}>
+                  <strong>{error.code}</strong>
+                  {error.message}
+                </p>
+              ))}
+            </article>
+
+            <article className="stream-card">
+              <h3>Safe client log</h3>
+              <dl className="stream-metadata">
+                <div>
+                  <dt>Event</dt>
+                  <dd>{sessionStreamState.safeLogEvent.event}</dd>
+                </div>
+                <div>
+                  <dt>Payload</dt>
+                  <dd>{safeSessionStreamLogExcludesForbiddenContent(sessionStreamState.safeLogEvent) ? "metadata only" : "blocked"}</dd>
+                </div>
+              </dl>
+            </article>
           </div>
         </section>
 

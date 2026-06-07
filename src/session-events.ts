@@ -27,6 +27,12 @@ export type ProgressEventView = {
   createdAt: string | null;
 };
 
+export type StreamWarning = {
+  eventId: string | null;
+  kind: "SEQUENCE_GAP" | "MALFORMED_EVENT";
+  message: string;
+};
+
 export type ProposedActionView = {
   actionId: string;
   actionType?: string | null;
@@ -46,11 +52,16 @@ export type SessionState = {
   proposedActions: Record<string, ProposedActionView>;
   errors: UserFacingError[];
   processedEventIds: string[];
+  lastEventId: string | null;
+  lastSequence: number | null;
+  streamWarnings: StreamWarning[];
 };
 
 type SessionEvent = {
   eventId?: string;
+  sequence?: number;
   type?: string;
+  payload?: SessionEventPayload;
   message?: string;
   messageId?: string;
   delta?: string;
@@ -63,6 +74,20 @@ type SessionEvent = {
     code?: string;
   };
   createdAt?: string;
+};
+
+type SessionEventPayload = {
+  message?: string;
+  messageId?: string;
+  delta?: string;
+  content?: string;
+  action?: UnsafeProposedAction;
+  actionId?: string;
+  status?: string;
+  error?: {
+    category?: string;
+    code?: string;
+  };
 };
 
 type UnsafeProposedAction = {
@@ -83,6 +108,7 @@ const INVALID_SESSION_EVENT_ERROR = Object.freeze({
   category: "VALIDATION",
   code: "INVALID_SESSION_EVENT"
 });
+const SEQUENCE_GAP_WARNING = "The event stream skipped one or more updates. Refresh durable state before applying changes.";
 
 export function createInitialSessionState(): SessionState {
   return {
@@ -91,18 +117,22 @@ export function createInitialSessionState(): SessionState {
     progress: [],
     proposedActions: {},
     errors: [],
-    processedEventIds: []
+    processedEventIds: [],
+    lastEventId: null,
+    lastSequence: null,
+    streamWarnings: []
   };
 }
 
 export function reduceSessionEvent(state: SessionState | undefined, event: SessionEvent | null | undefined): SessionState {
   const current = state ?? createInitialSessionState();
-  if (!event || typeof event.type !== "string") {
-    return current;
+  const normalizedEvent = normalizeSessionEvent(event);
+  if (!normalizedEvent) {
+    return recordMalformedEvent(current);
   }
 
   const processedEventIdSet = new Set(current.processedEventIds);
-  if (event.eventId && processedEventIdSet.has(event.eventId)) {
+  if (normalizedEvent.eventId && processedEventIdSet.has(normalizedEvent.eventId)) {
     return current;
   }
 
@@ -112,10 +142,14 @@ export function reduceSessionEvent(state: SessionState | undefined, event: Sessi
     progress: [...current.progress],
     proposedActions: { ...current.proposedActions },
     errors: [...current.errors],
-    processedEventIds: appendProcessedEventId(current.processedEventIds, event.eventId)
+    processedEventIds: appendProcessedEventId(current.processedEventIds, normalizedEvent.eventId),
+    lastEventId: normalizedEvent.eventId ?? current.lastEventId,
+    lastSequence: typeof normalizedEvent.sequence === "number" ? normalizedEvent.sequence : current.lastSequence,
+    streamWarnings: [...current.streamWarnings]
   };
+  recordSequenceGap(next, current.lastSequence, normalizedEvent);
 
-  switch (event.type) {
+  switch (normalizedEvent.type) {
     case SESSION_EVENT_TYPES.CONNECTED:
       next.connection = "CONNECTED";
       break;
@@ -124,41 +158,93 @@ export function reduceSessionEvent(state: SessionState | undefined, event: Sessi
       break;
     case SESSION_EVENT_TYPES.PROGRESS:
       next.progress.push({
-        eventId: event.eventId ?? null,
-        message: event.message ?? "Working",
-        createdAt: event.createdAt ?? null
+        eventId: normalizedEvent.eventId ?? null,
+        message: normalizedEvent.message ?? "Working",
+        createdAt: normalizedEvent.createdAt ?? null
       });
       break;
     case SESSION_EVENT_TYPES.ASSISTANT_DELTA:
-      appendAssistantDelta(next, event);
+      appendAssistantDelta(next, normalizedEvent);
       break;
     case SESSION_EVENT_TYPES.ASSISTANT_FINAL:
-      finalizeAssistantMessage(next, event);
+      finalizeAssistantMessage(next, normalizedEvent);
       break;
     case SESSION_EVENT_TYPES.ACTION_PROPOSED:
-      if (event.action?.actionId) {
-        next.proposedActions[event.action.actionId] = toSafeProposedActionView(event.action);
+      if (normalizedEvent.action?.actionId) {
+        next.proposedActions[normalizedEvent.action.actionId] = toSafeProposedActionView(normalizedEvent.action);
       }
       break;
     case SESSION_EVENT_TYPES.ACTION_STATUS:
-      if (event.actionId && ACTION_STATUS_VALUES.has(event.status ?? "")) {
-        next.proposedActions[event.actionId] = {
-          ...(next.proposedActions[event.actionId] ?? { actionId: event.actionId }),
-          status: event.status as ProposedActionStatus,
-          updatedAt: event.createdAt ?? null
+      if (normalizedEvent.actionId && ACTION_STATUS_VALUES.has(normalizedEvent.status ?? "")) {
+        next.proposedActions[normalizedEvent.actionId] = {
+          ...(next.proposedActions[normalizedEvent.actionId] ?? { actionId: normalizedEvent.actionId }),
+          status: normalizedEvent.status as ProposedActionStatus,
+          updatedAt: normalizedEvent.createdAt ?? null
         };
-      } else if (event.actionId) {
+      } else if (normalizedEvent.actionId) {
         next.errors.push(mapUserFacingError(INVALID_SESSION_EVENT_ERROR));
       }
       break;
     case SESSION_EVENT_TYPES.ERROR:
-      next.errors.push(mapUserFacingError(event.error));
+      next.errors.push(mapUserFacingError(normalizedEvent.error));
       break;
     default:
       next.errors.push(mapUserFacingError({ category: "INTERNAL", code: "UNKNOWN_SESSION_EVENT" }));
   }
 
   return next;
+}
+
+function normalizeSessionEvent(event: SessionEvent | null | undefined): SessionEvent | null {
+  if (!event || typeof event.type !== "string") {
+    return null;
+  }
+
+  const payload = isObject(event.payload) ? event.payload : {};
+  return {
+    ...event,
+    message: event.message ?? payload.message,
+    messageId: event.messageId ?? payload.messageId,
+    delta: event.delta ?? payload.delta,
+    content: event.content ?? payload.content,
+    action: event.action ?? payload.action,
+    actionId: event.actionId ?? payload.actionId,
+    status: event.status ?? payload.status,
+    error: event.error ?? payload.error
+  };
+}
+
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function recordMalformedEvent(state: SessionState): SessionState {
+  return {
+    ...state,
+    errors: [...state.errors, mapUserFacingError(INVALID_SESSION_EVENT_ERROR)],
+    streamWarnings: [
+      ...state.streamWarnings,
+      {
+        eventId: null,
+        kind: "MALFORMED_EVENT",
+        message: "The stream sent an event the client could not use."
+      }
+    ]
+  };
+}
+
+function recordSequenceGap(state: SessionState, previousSequence: number | null, event: SessionEvent): void {
+  if (typeof previousSequence !== "number" || typeof event.sequence !== "number") {
+    return;
+  }
+
+  if (event.sequence > previousSequence + 1) {
+    state.streamWarnings.push({
+      eventId: event.eventId ?? null,
+      kind: "SEQUENCE_GAP",
+      message: SEQUENCE_GAP_WARNING
+    });
+  }
 }
 
 function appendProcessedEventId(processedEventIds: readonly string[], eventId: string | undefined): string[] {

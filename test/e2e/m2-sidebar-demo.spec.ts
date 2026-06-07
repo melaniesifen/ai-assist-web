@@ -28,3 +28,22 @@ test("M2 sidebar demo works in Firefox", async ({ page }) => {
   await expect(page.getByRole("status").filter({ hasText: "No document mutation occurred." }).first()).toBeVisible();
   await expect(page.getByText("The browser surface does not call provider APIs")).toBeVisible();
 });
+
+test("M5 session stream demo renders SSE client states in Firefox", async ({ page }) => {
+  await page.goto("/");
+
+  const streamHarness = page.getByLabel("Session stream harness");
+  await expect(streamHarness).toBeVisible();
+  await expect(streamHarness.getByText("No streamed progress yet.")).toBeVisible();
+
+  await page.getByRole("button", { name: "Run stream" }).click();
+
+  await expect(streamHarness.getByText("Loading approved context")).toBeVisible();
+  await expect(streamHarness.getByText("Here is a streamed answer.")).toBeVisible();
+  await expect(streamHarness.getByText("Required")).toBeVisible();
+  await expect(streamHarness.getByText("evt-stream-6").first()).toBeVisible();
+  await expect(streamHarness.getByText("SEQUENCE_GAP")).toBeVisible();
+  await expect(streamHarness.getByText("INVALID_SESSION_EVENT")).toBeVisible();
+  await expect(streamHarness.getByText("RATE_LIMITED")).toBeVisible();
+  await expect(streamHarness.getByText("metadata only")).toBeVisible();
+});

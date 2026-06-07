@@ -137,7 +137,8 @@ code {
 }
 
 .setup-harness,
-.context-readiness-harness {
+.context-readiness-harness,
+.session-stream-harness {
   display: grid;
   gap: 14px;
   width: min(860px, 100%);
@@ -183,9 +184,16 @@ code {
   gap: 14px;
 }
 
+.stream-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
 .setup-scenario,
 .setup-coverage,
-.readiness-card {
+.readiness-card,
+.stream-card {
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 14px;
@@ -279,7 +287,8 @@ code {
 .setup-card dl,
 .safe-log,
 .readiness-summary,
-.readiness-metadata {
+.readiness-metadata,
+.stream-metadata {
   display: grid;
   gap: 6px;
   margin: 0;
@@ -328,6 +337,56 @@ code {
   border-top: 1px solid var(--line);
   padding-top: 10px;
   font-size: 0.78rem;
+}
+
+.stream-card {
+  display: grid;
+  gap: 10px;
+}
+
+.stream-card.warning {
+  border-color: #e6c76d;
+  background: #fffdf4;
+}
+
+.stream-metadata {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  font-size: 0.8rem;
+}
+
+.stream-list {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding-left: 1.2rem;
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.stream-warning,
+.stream-error {
+  margin-bottom: 0;
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 0.86rem;
+}
+
+.stream-warning {
+  color: #5f4700;
+  background: var(--warning-bg);
+}
+
+.stream-error {
+  color: var(--danger);
+  background: var(--danger-bg);
+}
+
+.stream-warning strong,
+.stream-error strong {
+  display: block;
+  margin-bottom: 3px;
+  color: var(--text);
+  font-size: 0.74rem;
 }
 
 .setup-errors {
@@ -720,7 +779,9 @@ dd {
   .safe-log,
   .readiness-grid,
   .readiness-summary,
-  .readiness-metadata {
+  .readiness-metadata,
+  .stream-grid,
+  .stream-metadata {
     grid-template-columns: 1fr;
   }
 

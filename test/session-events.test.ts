@@ -70,8 +70,12 @@ describe("session event reducer", () => {
   it("returns the current state for missing or malformed events", () => {
     const state = createInitialSessionState();
 
-    expect(reduceSessionEvent(state, null)).toBe(state);
-    expect(reduceSessionEvent(state, {})).toBe(state);
+    const reducedNull = reduceSessionEvent(state, null);
+    const reducedEmpty = reduceSessionEvent(state, {});
+
+    expect(reducedNull.errors[0].code).toBe("INVALID_SESSION_EVENT");
+    expect(reducedNull.streamWarnings[0].kind).toBe("MALFORMED_EVENT");
+    expect(reducedEmpty.errors[0].code).toBe("INVALID_SESSION_EVENT");
   });
 
   it("records unknown event types as safe errors", () => {
@@ -206,6 +210,54 @@ describe("session event reducer", () => {
 
     expect(state.messages).toEqual([
       { messageId: "msg-1", role: "assistant", content: "Complete response", status: "FINAL" }
+    ]);
+  });
+
+  it("reduces full SessionEvent envelopes with nested payloads", () => {
+    let state = createInitialSessionState();
+    state = reduceSessionEvent(state, {
+      eventId: "evt-1",
+      sequence: 1,
+      type: "progress",
+      payload: { message: "Loading approved context" },
+      createdAt: "2026-06-07T12:00:00.000Z"
+    });
+    state = reduceSessionEvent(state, {
+      eventId: "evt-2",
+      sequence: 2,
+      type: "assistant.delta",
+      payload: { messageId: "msg-1", delta: "Streaming " }
+    });
+    state = reduceSessionEvent(state, {
+      eventId: "evt-3",
+      sequence: 3,
+      type: "assistant.final",
+      payload: { messageId: "msg-1", content: "Streaming answer" }
+    });
+
+    expect(state.progress[0]).toEqual({
+      eventId: "evt-1",
+      message: "Loading approved context",
+      createdAt: "2026-06-07T12:00:00.000Z"
+    });
+    expect(state.messages).toEqual([
+      { messageId: "msg-1", role: "assistant", content: "Streaming answer", status: "FINAL" }
+    ]);
+    expect(state.lastEventId).toBe("evt-3");
+    expect(state.lastSequence).toBe(3);
+  });
+
+  it("records sequence gaps without exposing raw event payloads", () => {
+    let state = createInitialSessionState();
+    state = reduceSessionEvent(state, { eventId: "evt-1", sequence: 1, type: "progress" });
+    state = reduceSessionEvent(state, { eventId: "evt-3", sequence: 3, type: "progress" });
+
+    expect(state.streamWarnings).toEqual([
+      {
+        eventId: "evt-3",
+        kind: "SEQUENCE_GAP",
+        message: "The event stream skipped one or more updates. Refresh durable state before applying changes."
+      }
     ]);
   });
 });

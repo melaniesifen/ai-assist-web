@@ -34,6 +34,9 @@ Relevant design sources: frontend, provider-key, command, SSE, context, proposed
 - [ ] EVT-003: Add an authenticated SSE client for session streams with reconnect, `Last-Event-ID`, event ID dedupe, and HTTP durable-state refresh after gaps.
 - [ ] EVT-003: Add integration tests with mocked backend HTTP and SSE endpoints for onboarding, context preview, command creation, session events, proposed actions, and apply-action flows.
 - [x] EVT-003: Provide a bootstrap session-event reducer for progress, assistant deltas, assistant final, errors, action proposed, and action status changed.
+- [x] EVT-003: Add M5 local SSE frame/client helpers for full `SessionEvent` envelopes, event ID dedupe, `Last-Event-ID` reconnect cursor metadata, sequence-gap warnings, malformed-frame handling, and metadata-only stream logs.
+- [x] EVT-003: Render M5 command accepted, progress, assistant delta accumulation, assistant final, duplicate event, malformed event, sequence-gap, reconnect-required, and safe error states in the local UI harness.
+- [x] EVT-003: Cover M5 session stream behavior with Vitest reducer/helper tests and Firefox Playwright UI assertions.
 - [x] ACTION-003: Add M2 proposed-action approve/reject UI that creates backend-shaped action decision commands and treats duplicate responses deterministically.
 - [x] ACTION-004: Add M2 safe apply-action UI that creates backend-shaped apply commands with idempotency keys, requires backend-shaped apply results before terminal states, handles duplicate apply attempts deterministically, and never calls connector mutation APIs directly.
 - [x] ACTION-004: Provide bootstrap proposed-action status helpers for review, approval, rejection, applied, conflicted, failed, and expired states.
