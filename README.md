@@ -19,6 +19,9 @@ safe-error behavior in pure TypeScript helpers with unit tests.
 - `src/setup-state.ts`: M3 first-run setup state mapping for product session,
   Google OAuth, provider-secret readiness, resource-session readiness, safe
   setup errors, and metadata-only setup log events.
+- `src/m4-readiness.ts`: M4 Google Docs read-path readiness state mapping for
+  `SELECTION`, `ACTIVE_RESOURCE`, consent states, normalized context metadata,
+  reconnect-required, permission failures, and metadata-only client log events.
 - `src/session-events.ts`: reducer for SSE-style session events.
 - `src/proposed-actions.ts`: user-facing proposed-action state helpers.
 - `src/extension-surface.ts`: Google Docs browser-extension MVP surface
@@ -118,6 +121,22 @@ Tests import the real M3 setup fixtures from `ai-assist-contracts` and map them
 through `src/setup-state.ts`. Runtime demo data remains local so the browser
 bundle does not depend on a sibling repo fixture path. Setup log payloads contain
 only metadata such as statuses, providers, update time, and error kinds.
+
+## M4 Read-Path Readiness Harness
+
+The local app renders Google Docs read-path readiness states for `SELECTION` and
+`ACTIVE_RESOURCE`. It shows active, missing, revoked, and expired consent,
+normalized metadata such as content hash, revision, provenance, trust level, and
+truncation state, plus safe reconnect-required and permission-failure messages.
+
+The UI intentionally renders metadata only for normalized context. It does not
+render raw document text or selected text in the readiness cards, and its safe
+log event contains only scenario ID, mode, consent status, connector status,
+failure code, provenance trust level, and truncation status.
+
+Tests import the real M4 Google Docs read-path fixtures from
+`ai-assist-contracts` and validate the web mapper against the shared connector
+and normalized-context shapes.
 
 ## Task Breakdown
 

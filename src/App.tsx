@@ -31,6 +31,12 @@ import {
   type FirstRunSetupViewModel,
   type SetupCardViewModel
 } from "./setup-state";
+import {
+  createM4DemoReadinessStates,
+  createM4ReadinessViewModel,
+  safeM4LogExcludesForbiddenContent,
+  type M4ReadinessViewModel
+} from "./m4-readiness";
 
 const EMPTY_CHAT_INPUT = "";
 
@@ -53,6 +59,7 @@ export function App(): ReactElement {
   const [chatInput, setChatInput] = useState(EMPTY_CHAT_INPUT);
   const setupScenarios = useMemo(() => createSetupDemoStates().map(createFirstRunSetupViewModel), []);
   const setupCoverageLabels = useMemo(() => getStatusCoverageLabels(createSetupStatusCoverageFixtures()), []);
+  const m4ReadinessScenarios = useMemo(() => createM4DemoReadinessStates().map(createM4ReadinessViewModel), []);
   const contextModes = getM2ContextModeOptions();
   const approveAllState = getApproveAllState(reviewCards);
   const selectedContextMode = contextModes.find((mode) => mode.mode === "SELECTION");
@@ -135,6 +142,22 @@ export function App(): ReactElement {
               ))}
             </ul>
           </section>
+        </section>
+
+        <section className="m4-readiness-harness" aria-label="M4 Google Docs read-path readiness">
+          <header className="setup-header">
+            <div>
+              <p className="eyebrow">M4 Google Docs read path</p>
+              <h2>Context readiness and consent states</h2>
+            </div>
+            <span className="context-pill">Modes: SELECTION + ACTIVE_RESOURCE</span>
+          </header>
+
+          <div className="readiness-grid">
+            {m4ReadinessScenarios.map((scenario) => (
+              <ReadinessScenario key={scenario.id} scenario={scenario} />
+            ))}
+          </div>
         </section>
 
         {!shellState.panelOpen ? (
@@ -316,6 +339,54 @@ export function App(): ReactElement {
         </aside>
       ) : null}
     </main>
+  );
+}
+
+function ReadinessScenario({ scenario }: { scenario: M4ReadinessViewModel }): ReactElement {
+  return (
+    <article className={`readiness-card ${scenario.tone}`}>
+      <header className="readiness-header">
+        <div>
+          <h3>{scenario.title}</h3>
+          <p>{scenario.contextLabel}</p>
+        </div>
+        <span className={`status-badge ${scenario.tone === "ready" ? "ready" : "blocked"}`}>
+          {scenario.tone === "ready" ? "Ready" : "Blocked"}
+        </span>
+      </header>
+
+      <dl className="readiness-summary">
+        <div>
+          <dt>Consent</dt>
+          <dd>{scenario.consentLabel}</dd>
+        </div>
+        <div>
+          <dt>Safe log</dt>
+          <dd>{safeM4LogExcludesForbiddenContent(scenario.safeLogEvent) ? "metadata only" : "blocked"}</dd>
+        </div>
+      </dl>
+
+      <p className="readiness-message">{scenario.userMessage}</p>
+      <p className="readiness-consent">{scenario.consentMessage}</p>
+
+      {scenario.failure ? (
+        <div className="readiness-failure" role="status">
+          <strong>{scenario.failure.code}</strong>
+          <p>{scenario.failure.message}</p>
+        </div>
+      ) : null}
+
+      {scenario.metadata.length > 0 ? (
+        <dl className="readiness-metadata" aria-label={`${scenario.title} normalized metadata`}>
+          {scenario.metadata.map((item) => (
+            <div key={`${scenario.id}-${item.label}`}>
+              <dt>{item.label}</dt>
+              <dd>{item.value}</dd>
+            </div>
+          ))}
+        </dl>
+      ) : null}
+    </article>
   );
 }
 

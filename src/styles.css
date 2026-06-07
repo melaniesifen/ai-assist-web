@@ -136,7 +136,8 @@ code {
   line-height: 1.65;
 }
 
-.setup-harness {
+.setup-harness,
+.m4-readiness-harness {
   display: grid;
   gap: 14px;
   width: min(860px, 100%);
@@ -176,8 +177,15 @@ code {
   gap: 14px;
 }
 
+.readiness-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
 .setup-scenario,
-.setup-coverage {
+.setup-coverage,
+.readiness-card {
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 14px;
@@ -192,13 +200,29 @@ code {
   border-color: #e5b5ad;
 }
 
-.scenario-header {
+.readiness-card.ready {
+  border-color: #9bd1ab;
+}
+
+.readiness-card.blocked {
+  border-color: #e5b5ad;
+}
+
+.readiness-card.warning {
+  border-color: #e6c76d;
+}
+
+.scenario-header,
+.readiness-header {
   align-items: flex-start;
   margin-bottom: 12px;
 }
 
 .scenario-header p,
-.setup-card p {
+.setup-card p,
+.readiness-header p,
+.readiness-message,
+.readiness-consent {
   margin-bottom: 0;
   color: var(--muted);
   font-size: 0.86rem;
@@ -253,7 +277,9 @@ code {
 }
 
 .setup-card dl,
-.safe-log {
+.safe-log,
+.readiness-summary,
+.readiness-metadata {
   display: grid;
   gap: 6px;
   margin: 0;
@@ -262,6 +288,46 @@ code {
 .setup-card dl {
   grid-template-columns: 1fr;
   font-size: 0.8rem;
+}
+
+.readiness-summary {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-bottom: 10px;
+  font-size: 0.8rem;
+}
+
+.readiness-message,
+.readiness-consent {
+  margin-top: 8px;
+}
+
+.readiness-failure {
+  margin-top: 10px;
+  border: 1px solid #e5b5ad;
+  border-radius: 6px;
+  padding: 8px 10px;
+  color: var(--danger);
+  background: var(--danger-bg);
+}
+
+.readiness-failure strong {
+  display: block;
+  margin-bottom: 3px;
+  color: var(--text);
+  font-size: 0.74rem;
+}
+
+.readiness-failure p {
+  margin-bottom: 0;
+  font-size: 0.86rem;
+}
+
+.readiness-metadata {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 10px;
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+  font-size: 0.78rem;
 }
 
 .setup-errors {
@@ -651,7 +717,10 @@ dd {
   .metadata-strip dl,
   .setup-scenarios,
   .setup-card-grid,
-  .safe-log {
+  .safe-log,
+  .readiness-grid,
+  .readiness-summary,
+  .readiness-metadata {
     grid-template-columns: 1fr;
   }
 

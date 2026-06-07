@@ -27,8 +27,8 @@ Relevant design sources: frontend, provider-key, command, SSE, context, proposed
 - [ ] AUTH-005: Add provider-key entry and validation UI that sends keys only to backend HTTPS APIs, displays metadata/fingerprint only, and handles validation rate limits safely.
 - [x] CTX-001: Keep MVP context UI limited to `SELECTION` and `ACTIVE_RESOURCE`; show future modes as disabled until backend gates exist.
 - [x] CTX-001: Provide bootstrap context-mode labels and availability helpers.
-- [ ] CTX-002: Add consent-grant UI states for active, missing, revoked, and expired consent before context capture.
-- [ ] CTX-003: Render normalized context metadata and truncation/redaction indicators without logging or persisting raw document content.
+- [x] CTX-002: Add consent-grant UI states for active, missing, revoked, and expired consent before context capture.
+- [x] CTX-003: Render normalized context metadata and truncation/redaction indicators without logging or persisting raw document content.
 - [ ] CTX-004: Make client-supplied context visibly non-authoritative for write-back unless connector-verified target metadata exists.
 - [ ] EVT-001: Wire authenticated HTTP command calls for auth setup, provider-key validation, resource/session creation, context preview, command creation, action approval, and apply-action.
 - [ ] EVT-003: Add an authenticated SSE client for session streams with reconnect, `Last-Event-ID`, event ID dedupe, and HTTP durable-state refresh after gaps.
@@ -53,6 +53,17 @@ Relevant design sources: frontend, provider-key, command, SSE, context, proposed
 - [x] Keep first-run setup context posture at `SELECTION`; future modes remain out of this setup harness.
 - [x] Verify setup log payloads exclude OAuth tokens, provider keys, bearer tokens, prompts, document text, model responses, screenshots, and action payloads.
 - [x] Add tests that import and validate real M3 setup fixtures from `ai-assist-contracts`.
+
+## M4 Google Docs Read-Path Harness Progress
+
+- [x] Render read-path readiness for Google Docs `SELECTION` and `ACTIVE_RESOURCE` context.
+- [x] Render active, missing, revoked, and expired consent states before context capture.
+- [x] Render normalized context metadata with content hash, truncation state, revision, provenance, and connector trust without rendering raw document text or selected text in the readiness cards.
+- [x] Render reconnect-required and permission failure states with safe user-facing messages.
+- [x] Verify M4 client log events exclude OAuth tokens, authorization headers, document text, selected text, prompts, model responses, screenshots, OCR, accessibility trees, provider keys, and action payloads.
+- [x] Add tests that import and validate real M4 read-path fixtures from `ai-assist-contracts`.
+- [x] Browser smoke check passes for the local M4 read-path readiness harness.
+- [x] Fresh M4 web review feedback is written under ignored `feedback/` with no blocking findings.
 
 ## M2 Local Sidebar Demo Progress
 
