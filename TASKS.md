@@ -68,6 +68,16 @@ Relevant design sources: frontend, provider-key, command, SSE, context, proposed
 - [x] Browser smoke check passes for the local M4 read-path readiness harness.
 - [x] Fresh M4 web review feedback is written under ignored `feedback/` with no blocking findings.
 
+## M6 Durable Proposed-Action UI Progress
+
+- [x] M6-T4: Render proposed-action review cards from full `SessionEvent` `action.proposed` payloads.
+- [x] M6-T4: Add or verify approve and reject command UI with backend-shaped command payloads.
+- [x] M6-T4: Update action statuses from `action.status_changed` events.
+- [x] M6-T4: Render proposed, approved, rejected, expired, denied, and safe error states.
+- [x] M6-T4: Verify action payload plaintext is not logged and appears only in active user-visible review state when needed.
+- [x] M6-T4: Run web unit tests, production build, and Firefox e2e checks for the browser-facing UI.
+- [x] M6-T4: Fresh reviewer feedback is written under ignored `feedback/` with no unresolved blocking findings.
+
 ## M2 Local Sidebar Demo Progress
 
 - [x] Implement a sidebar/side-panel assistant shell as the primary M2 UI surface for the local demo.

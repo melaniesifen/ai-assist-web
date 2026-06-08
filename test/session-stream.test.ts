@@ -21,7 +21,11 @@ describe("session stream client helpers", () => {
     expect(state.session.streamWarnings.map((warning) => warning.kind)).toContain("SEQUENCE_GAP");
     expect(state.malformedFrameCount).toBe(1);
     expect(state.reconnectRequired).toBe(true);
-    expect(state.session.errors.map((error) => error.code)).toEqual(["INVALID_SESSION_EVENT", "RATE_LIMITED"]);
+    expect(state.session.errors.map((error) => error.code)).toEqual([
+      "AUTHORIZATION_DENIED",
+      "INVALID_SESSION_EVENT",
+      "RATE_LIMITED"
+    ]);
   });
 
   it("creates Last-Event-ID headers only when a reconnect cursor exists", () => {

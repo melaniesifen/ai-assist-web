@@ -1,6 +1,25 @@
 import { describe, expect, it } from "vitest";
 import { MAX_PROCESSED_EVENT_IDS, createInitialSessionState, reduceSessionEvent } from "../src/session-events";
 
+async function loadProposedActionEventFixtures(): Promise<{
+  actionProposedEventFixture: { value: Record<string, unknown> };
+  actionStatusEventFixtures: readonly { value: Record<string, unknown> }[];
+  crossScopeDeniedResponseFixture: { value: { error: { category: string; code: string } } };
+  validateSessionEvent: (value: unknown) => { valid: boolean; issues: readonly unknown[] };
+}> {
+  // @ts-expect-error - sibling contract fixtures are JavaScript-only until contracts publish generated TypeScript types.
+  const fixtures = await import("../../ai-assist-contracts/fixtures/proposed-actions.fixtures.js");
+  // @ts-expect-error - sibling contract validators are JavaScript-only until contracts publish generated TypeScript types.
+  const events = await import("../../ai-assist-contracts/src/events.js");
+
+  return {
+    actionProposedEventFixture: fixtures.actionProposedEventFixture,
+    actionStatusEventFixtures: fixtures.actionStatusEventFixtures,
+    crossScopeDeniedResponseFixture: fixtures.crossScopeDeniedResponseFixture,
+    validateSessionEvent: events.validateSessionEvent
+  };
+}
+
 describe("session event reducer", () => {
   it("reduces assistant deltas and final events into a single message", () => {
     let state = createInitialSessionState();
@@ -97,7 +116,7 @@ describe("session event reducer", () => {
     });
     state = reduceSessionEvent(state, {
       eventId: "evt-2",
-      type: "action.status",
+      type: "action.status_changed",
       actionId: "action-1",
       status: "CONFLICTED"
     });
@@ -108,7 +127,7 @@ describe("session event reducer", () => {
   it("creates an action status view for valid status events that arrive before proposal details", () => {
     const state = reduceSessionEvent(createInitialSessionState(), {
       eventId: "evt-1",
-      type: "action.status",
+      type: "action.status_changed",
       actionId: "action-1",
       status: "APPROVED",
       createdAt: "2026-05-30T00:00:00.000Z"
@@ -158,7 +177,7 @@ describe("session event reducer", () => {
     });
     state = reduceSessionEvent(state, {
       eventId: "evt-2",
-      type: "action.status",
+      type: "action.status_changed",
       actionId: "action-1",
       status: "BAD_STATUS"
     });
@@ -170,7 +189,7 @@ describe("session event reducer", () => {
   it("does not create action placeholders for invalid status events", () => {
     const state = reduceSessionEvent(createInitialSessionState(), {
       eventId: "evt-1",
-      type: "action.status",
+      type: "action.status_changed",
       actionId: "action-1",
       status: undefined
     });
@@ -245,6 +264,67 @@ describe("session event reducer", () => {
     ]);
     expect(state.lastEventId).toBe("evt-3");
     expect(state.lastSequence).toBe(3);
+  });
+
+  it("reduces contract action.proposed and action.status_changed SessionEvent fixtures", async () => {
+    const { actionProposedEventFixture, actionStatusEventFixtures, validateSessionEvent } = await loadProposedActionEventFixtures();
+    const approvedStatusEvent = actionStatusEventFixtures.find((fixture) =>
+      String(fixture.value.eventId).includes("approved")
+    );
+    expect(approvedStatusEvent).toBeDefined();
+    expect(validateSessionEvent(actionProposedEventFixture.value)).toMatchObject({ valid: true, issues: [] });
+    expect(validateSessionEvent(approvedStatusEvent!.value)).toMatchObject({ valid: true, issues: [] });
+
+    let state = createInitialSessionState();
+    state = reduceSessionEvent(state, actionProposedEventFixture.value);
+    state = reduceSessionEvent(state, approvedStatusEvent!.value);
+
+    expect(state.proposedActions["action_proposed_action_demo"]).toEqual({
+      actionId: "action_proposed_action_demo",
+      actionType: "REPLACE_TEXT",
+      resourceId: "resource_proposed_action_demo",
+      resourceTitle: "Fixture proposal document",
+      preview: "Review one proposed edit.",
+      createdAt: null,
+      expiresAt: "2026-06-09T16:00:00.000Z",
+      status: "APPROVED",
+      updatedAt: "2026-06-08T16:05:00.000Z"
+    });
+  });
+
+  it("renders rejected, expired, and denied contract event states safely", async () => {
+    const { actionStatusEventFixtures, crossScopeDeniedResponseFixture } = await loadProposedActionEventFixtures();
+    const rejectedStatusEvent = actionStatusEventFixtures.find((fixture) =>
+      String(fixture.value.eventId).includes("rejected")
+    );
+    const expiredStatusEvent = actionStatusEventFixtures.find((fixture) =>
+      String(fixture.value.eventId).includes("expired")
+    );
+    expect(rejectedStatusEvent).toBeDefined();
+    expect(expiredStatusEvent).toBeDefined();
+
+    let state = createInitialSessionState();
+    state = reduceSessionEvent(state, rejectedStatusEvent!.value);
+    state = reduceSessionEvent(state, {
+      eventId: "evt-denied",
+      type: "error",
+      payload: {
+        errorCode: crossScopeDeniedResponseFixture.value.error.code,
+        category: crossScopeDeniedResponseFixture.value.error.category,
+        retryable: false,
+        message: "Access denied."
+      }
+    });
+    state = reduceSessionEvent(state, expiredStatusEvent!.value);
+
+    expect(state.proposedActions["action_proposed_action_demo"].status).toBe("EXPIRED");
+    expect(state.errors).toContainEqual({
+      category: "AUTHORIZATION",
+      code: "AUTHORIZATION_DENIED",
+      message: "You do not have access to that resource.",
+      retryable: false
+    });
+    expect(JSON.stringify(state)).not.toMatch(/selected text|document text|action payload|sk-live/i);
   });
 
   it("records sequence gaps without exposing raw event payloads", () => {

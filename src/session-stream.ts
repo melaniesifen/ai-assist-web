@@ -42,7 +42,8 @@ export type SessionStreamLogEvent = {
 };
 
 export const SESSION_STREAM_FORBIDDEN_LOG_PATTERNS = [
-  /authorization/i,
+  /authorization[_ -]?header/i,
+  /authorization:/i,
   /bearer/i,
   /oauth/i,
   /provider[_-]?key/i,
@@ -65,6 +66,14 @@ const DEMO_CORRELATION_ID = "correlation_demo_stream";
 const DEMO_SESSION_ID = "session_stream_demo";
 const DEMO_TENANT_ID = "tenant_demo";
 const DEMO_USER_ID = "user_demo";
+const DEMO_ACTION_ID = "action_stream_review";
+const DEMO_RESOURCE_REF = Object.freeze({
+  connector: "google_docs",
+  resourceId: "gdoc_stream_demo",
+  resourceType: "document",
+  displayName: "Stream demo document",
+  externalUrl: "https://docs.google.com/document/d/gdoc_stream_demo/edit"
+});
 
 export function createInitialSessionStreamClientState(): SessionStreamClientState {
   return {
@@ -158,8 +167,49 @@ export function createSessionStreamDemoFrames(): string[] {
     toSseFrame(createDemoEnvelope("evt-stream-2", 2, "assistant.delta", { messageId: "assistant-stream", delta: "duplicate" })),
     toSseFrame(createDemoEnvelope("evt-stream-4", 4, "assistant.delta", { messageId: "assistant-stream", delta: "a streamed answer." })),
     toSseFrame(createDemoEnvelope("evt-stream-5", 5, "assistant.final", { messageId: "assistant-stream" })),
+    toSseFrame(
+      createDemoEnvelope("evt-stream-6", 6, "action.proposed", {
+        actionId: DEMO_ACTION_ID,
+        actionType: "REPLACE_TEXT",
+        resourceRef: DEMO_RESOURCE_REF,
+        summary: "Review one proposed edit.",
+        expiresAt: "2026-06-08T12:00:00.000Z"
+      })
+    ),
+    toSseFrame(
+      createDemoEnvelope("evt-stream-7", 7, "action.status_changed", {
+        actionId: DEMO_ACTION_ID,
+        previousStatus: "PROPOSED",
+        status: "APPROVED",
+        reasonCode: "USER_APPROVED"
+      })
+    ),
+    toSseFrame(
+      createDemoEnvelope("evt-stream-8", 8, "action.status_changed", {
+        actionId: "action_stream_rejected",
+        previousStatus: "PROPOSED",
+        status: "REJECTED",
+        reasonCode: "USER_REJECTED"
+      })
+    ),
+    toSseFrame(
+      createDemoEnvelope("evt-stream-9", 9, "action.status_changed", {
+        actionId: "action_stream_expired",
+        previousStatus: "PROPOSED",
+        status: "EXPIRED",
+        reasonCode: "ACTION_EXPIRED"
+      })
+    ),
+    toSseFrame(
+      createDemoEnvelope("evt-stream-10", 10, "error", {
+        errorCode: "AUTHORIZATION_DENIED",
+        category: "AUTHORIZATION",
+        retryable: false,
+        message: "Access denied."
+      })
+    ),
     "id: evt-stream-bad\nevent: message\ndata: {bad json",
-    toSseFrame(createDemoEnvelope("evt-stream-6", 6, "error", { error: { category: "PROVIDER", code: "RATE_LIMITED" } }))
+    toSseFrame(createDemoEnvelope("evt-stream-11", 11, "error", { error: { category: "PROVIDER", code: "RATE_LIMITED" } }))
   ];
 }
 

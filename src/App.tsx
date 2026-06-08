@@ -79,6 +79,7 @@ export function App(): ReactElement {
   const selectedContextMode = contextModes.find((mode) => mode.mode === "SELECTION");
   const activeResourceMode = contextModes.find((mode) => mode.mode === "ACTIVE_RESOURCE");
   const lastEventHeaders = createLastEventIdHeaders(sessionStreamState.lastEventId);
+  const streamedProposedActions = Object.values(sessionStreamState.session.proposedActions);
   const latestCommand = reviewCards.reduce<ReviewCardViewModel["lastCommand"]>(
     (command, card) => card.lastCommand ?? command,
     null
@@ -254,6 +255,23 @@ export function App(): ReactElement {
               )}
             </article>
           </div>
+
+          <article className="stream-card action-stream-card" aria-label="Streamed proposed action states">
+            <h3>Proposed actions</h3>
+            {streamedProposedActions.length === 0 ? (
+              <p className="empty-state">Run the stream to render action proposals and status changes.</p>
+            ) : (
+              <ul className="stream-list">
+                {streamedProposedActions.map((action) => (
+                  <li key={action.actionId}>
+                    <strong>{action.status}</strong>
+                    <span>{action.preview ?? action.actionId}</span>
+                    {action.resourceTitle ? <small>{action.resourceTitle}</small> : null}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </article>
 
           <div className="stream-grid">
             <article className="stream-card warning">

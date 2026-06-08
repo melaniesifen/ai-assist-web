@@ -7,7 +7,7 @@ export const SESSION_EVENT_TYPES = Object.freeze({
   ASSISTANT_FINAL: "assistant.final",
   ERROR: "error",
   ACTION_PROPOSED: "action.proposed",
-  ACTION_STATUS: "action.status",
+  ACTION_STATUS_CHANGED: "action.status_changed",
   CONNECTED: "transport.connected",
   DISCONNECTED: "transport.disconnected"
 });
@@ -73,6 +73,7 @@ type SessionEvent = {
     category?: string;
     code?: string;
   };
+  errorCode?: string;
   createdAt?: string;
 };
 
@@ -83,11 +84,20 @@ type SessionEventPayload = {
   content?: string;
   action?: UnsafeProposedAction;
   actionId?: string;
+  actionType?: string;
+  resourceRef?: UnsafeResourceRef;
+  summary?: string;
+  expiresAt?: string;
   status?: string;
+  previousStatus?: string;
+  reasonCode?: string;
   error?: {
     category?: string;
     code?: string;
   };
+  errorCode?: string;
+  category?: string;
+  retryable?: boolean;
 };
 
 type UnsafeProposedAction = {
@@ -95,10 +105,17 @@ type UnsafeProposedAction = {
   actionType?: string;
   resourceId?: string;
   resourceTitle?: string;
+  resourceRef?: UnsafeResourceRef;
   preview?: string;
+  summary?: string;
   createdAt?: string;
   expiresAt?: string;
   status?: string;
+};
+
+type UnsafeResourceRef = {
+  resourceId?: string;
+  displayName?: string;
 };
 
 export const MAX_PROCESSED_EVENT_IDS = 500;
@@ -174,7 +191,7 @@ export function reduceSessionEvent(state: SessionState | undefined, event: Sessi
         next.proposedActions[normalizedEvent.action.actionId] = toSafeProposedActionView(normalizedEvent.action);
       }
       break;
-    case SESSION_EVENT_TYPES.ACTION_STATUS:
+    case SESSION_EVENT_TYPES.ACTION_STATUS_CHANGED:
       if (normalizedEvent.actionId && ACTION_STATUS_VALUES.has(normalizedEvent.status ?? "")) {
         next.proposedActions[normalizedEvent.actionId] = {
           ...(next.proposedActions[normalizedEvent.actionId] ?? { actionId: normalizedEvent.actionId }),
@@ -207,10 +224,10 @@ function normalizeSessionEvent(event: SessionEvent | null | undefined): SessionE
     messageId: event.messageId ?? payload.messageId,
     delta: event.delta ?? payload.delta,
     content: event.content ?? payload.content,
-    action: event.action ?? payload.action,
+    action: event.action ?? payload.action ?? toActionFromPayload(event, payload),
     actionId: event.actionId ?? payload.actionId,
     status: event.status ?? payload.status,
-    error: event.error ?? payload.error
+    error: event.error ?? payload.error ?? toErrorFromPayload(event, payload)
   };
 }
 
@@ -259,13 +276,40 @@ function toSafeProposedActionView(action: UnsafeProposedAction): ProposedActionV
   return {
     actionId: action.actionId as string,
     actionType: action.actionType ?? null,
-    resourceId: action.resourceId ?? null,
-    resourceTitle: action.resourceTitle ?? null,
-    preview: typeof action.preview === "string" ? action.preview : null,
+    resourceId: action.resourceId ?? action.resourceRef?.resourceId ?? null,
+    resourceTitle: action.resourceTitle ?? action.resourceRef?.displayName ?? action.resourceRef?.resourceId ?? null,
+    preview: typeof action.preview === "string" ? action.preview : (action.summary ?? null),
     createdAt: action.createdAt ?? null,
     expiresAt: action.expiresAt ?? null,
     status: PROPOSED_ACTION_STATUSES.PROPOSED
   };
+}
+
+function toActionFromPayload(event: SessionEvent, payload: SessionEventPayload): UnsafeProposedAction | undefined {
+  if (event.type !== SESSION_EVENT_TYPES.ACTION_PROPOSED || typeof payload.actionId !== "string") {
+    return undefined;
+  }
+
+  return {
+    actionId: payload.actionId,
+    actionType: payload.actionType,
+    resourceRef: payload.resourceRef,
+    summary: payload.summary,
+    expiresAt: payload.expiresAt
+  };
+}
+
+function toErrorFromPayload(
+  event: SessionEvent,
+  payload: SessionEventPayload
+): { category?: string; code?: string } | undefined {
+  const category = event.error?.category ?? payload.error?.category ?? payload.category;
+  const code = event.error?.code ?? payload.error?.code ?? event.errorCode ?? payload.errorCode;
+  if (category === undefined && code === undefined) {
+    return undefined;
+  }
+
+  return { category, code };
 }
 
 function appendAssistantDelta(state: SessionState, event: SessionEvent): void {
