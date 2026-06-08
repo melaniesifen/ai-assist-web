@@ -1,4 +1,5 @@
 import { CONTEXT_MODE_IDS, getContextModeOptions } from "./context-modes";
+import { mapUserFacingError, type UserFacingError } from "./error-mapping";
 import { FORBIDDEN_EXTENSION_RETENTION } from "./extension-surface";
 import { PROPOSED_ACTION_STATUSES, getProposedActionState, type ProposedActionStatus } from "./proposed-actions";
 
@@ -96,6 +97,8 @@ export type ReviewCardViewModel = {
   isSafeForApproveAll: boolean;
   lastCommand: BackendCommandView | null;
   pendingApplyCommand: BackendCommandView | null;
+  applyResponse: BackendApplyResponseView | null;
+  applyDisplay: ApplyDisplayModel | null;
   duplicateNotice: string | null;
 };
 
@@ -120,19 +123,59 @@ export type BackendCommandView = {
   };
 };
 
+export type BackendApplyResponseView = {
+  commandId: string;
+  commandType: "actions.apply";
+  status: "completed" | "rejected";
+  result?: {
+    actionId: string;
+    sessionId: string;
+    resourceId: string;
+    status: Extract<ProposedActionStatus, "APPLIED" | "CONFLICTED" | "FAILED" | "EXPIRED">;
+    idempotencyKey: string;
+    replayed?: boolean;
+    operationId?: string;
+    conflictReasonCode?: string;
+    failureCode?: string;
+    resourceRevision?: string;
+    resultRecordedAt?: string;
+  };
+  error?: {
+    category: string;
+    code: string;
+    retryable: boolean;
+  };
+};
+
+export type ApplyDisplayModel = {
+  kind: "DURABLE_RESULT" | "SAFE_ERROR" | "DUPLICATE_REPLAY";
+  title: string;
+  message: string;
+  code: string | null;
+  retryable: boolean;
+};
+
+export type ActionStatusChangedEvent = {
+  type: "action.status_changed";
+  eventId?: string;
+  createdAt?: string;
+  payload?: {
+    actionId?: string;
+    previousStatus?: string;
+    status?: string;
+    reasonCode?: string;
+  };
+  actionId?: string;
+  status?: string;
+  reasonCode?: string;
+};
+
 export type ApproveAllState = {
   enabled: boolean;
   reason: string | null;
 };
 
-export type MockApplyResult = {
-  commandId: string;
-  commandType: "actions.apply";
-  idempotencyKey: string;
-  actionId: string;
-  status: Extract<ProposedActionStatus, "APPLIED" | "FAILED" | "CONFLICTED">;
-  conflictReasonCode?: string;
-};
+export type MockApplyResult = BackendApplyResponseView;
 
 export type MockChatState = {
   messages: readonly MockChatMessage[];
@@ -361,6 +404,8 @@ export function mapReviewFixtureToCard(
     isSafeForApproveAll: actionState.canApprove && conflict === null && hasVerifiedTarget,
     lastCommand: null,
     pendingApplyCommand: null,
+    applyResponse: null,
+    applyDisplay: null,
     duplicateNotice: null
   };
 }
@@ -386,6 +431,8 @@ export function approveReviewCard(card: ReviewCardViewModel, sessionId = ASSISTA
     canApply: true,
     isSafeForApproveAll: false,
     lastCommand: createDecisionCommand("actions.approve", card.actionId, sessionId, "USER_APPROVED"),
+    applyResponse: null,
+    applyDisplay: null,
     duplicateNotice: null
   };
 }
@@ -408,6 +455,8 @@ export function rejectReviewCard(card: ReviewCardViewModel, sessionId = ASSISTAN
     isSafeForApproveAll: false,
     lastCommand: createDecisionCommand("actions.reject", card.actionId, sessionId, "USER_REJECTED"),
     pendingApplyCommand: null,
+    applyResponse: null,
+    applyDisplay: null,
     duplicateNotice: null
   };
 }
@@ -427,15 +476,27 @@ export function applyReviewCard(card: ReviewCardViewModel, sessionId = ASSISTANT
     canApply: false,
     pendingApplyCommand: command,
     lastCommand: command,
+    applyResponse: null,
+    applyDisplay: null,
     duplicateNotice: null
   };
 }
 
 export function createMockApplyResult(
   card: ReviewCardViewModel,
-  status: MockApplyResult["status"] = PROPOSED_ACTION_STATUSES.APPLIED,
+  status: NonNullable<MockApplyResult["result"]>["status"] = PROPOSED_ACTION_STATUSES.APPLIED,
   conflictReasonCode?: string
 ): MockApplyResult {
+  return createMockApplyResponseWithResult(card, {
+    status,
+    ...(conflictReasonCode === undefined ? {} : { conflictReasonCode })
+  });
+}
+
+export function createMockApplyResponse(
+  card: ReviewCardViewModel,
+  overrides: Partial<BackendApplyResponseView> = {}
+): BackendApplyResponseView {
   if (card.pendingApplyCommand === null) {
     throw new Error("Cannot create a mocked apply result without a pending apply request.");
   }
@@ -445,29 +506,77 @@ export function createMockApplyResult(
   return {
     commandId: command.commandId,
     commandType: "actions.apply",
-    idempotencyKey: card.idempotencyKey,
-    actionId: card.actionId,
-    status,
-    ...(conflictReasonCode === undefined ? {} : { conflictReasonCode })
+    status: "completed",
+    result: {
+      actionId: card.actionId,
+      sessionId: command.payload.sessionId,
+      resourceId: card.resourceId,
+      status: PROPOSED_ACTION_STATUSES.APPLIED,
+      idempotencyKey: card.idempotencyKey,
+      replayed: false
+    },
+    ...overrides
   };
 }
 
-export function resolveApplyResult(card: ReviewCardViewModel, result: MockApplyResult): ReviewCardViewModel {
+export function createMockApplyResponseWithResult(
+  card: ReviewCardViewModel,
+  resultOverrides: Partial<NonNullable<BackendApplyResponseView["result"]>>
+): BackendApplyResponseView {
+  const response = createMockApplyResponse(card);
+
+  return {
+    ...response,
+    result: {
+      ...response.result!,
+      ...resultOverrides
+    }
+  };
+}
+
+export function resolveApplyResult(card: ReviewCardViewModel, response: BackendApplyResponseView): ReviewCardViewModel {
   if (card.pendingApplyCommand === null) {
     return withDuplicateNotice(card, "Apply result ignored because no apply request is pending.");
   }
 
   if (
-    result.actionId !== card.actionId ||
-    result.idempotencyKey !== card.idempotencyKey ||
-    result.commandId !== card.pendingApplyCommand.commandId
+    response.commandType !== "actions.apply" ||
+    response.commandId !== card.pendingApplyCommand.commandId
   ) {
     return withDuplicateNotice(card, "Apply result ignored because it does not match this action request.");
   }
 
-  if (result.status === PROPOSED_ACTION_STATUSES.CONFLICTED) {
+  if (response.error !== undefined || response.status === "rejected") {
+    const safeError = response.error ?? { category: "INTERNAL", code: "APPLY_REJECTED", retryable: false };
+    const applyDisplay = createSafeApplyDisplay(safeError);
+
+    return {
+      ...card,
+      statusLabel: applyDisplay.title,
+      canApprove: false,
+      canReject: false,
+      canApply: false,
+      isSafeForApproveAll: false,
+      pendingApplyCommand: null,
+      applyResponse: response,
+      applyDisplay,
+      duplicateNotice: null
+    };
+  }
+
+  if (
+    response.result === undefined ||
+    response.result.actionId !== card.actionId ||
+    response.result.idempotencyKey !== card.idempotencyKey
+  ) {
+    return withDuplicateNotice(card, "Apply result ignored because it does not match this action request.");
+  }
+
+  const reasonCode = response.result.conflictReasonCode ?? response.result.failureCode;
+
+  if (response.result.status === PROPOSED_ACTION_STATUSES.CONFLICTED) {
     const conflict = createConflictDisplayModel(
-      result.conflictReasonCode ?? "APPLY_TARGET_CONFLICTED",
+      reasonCode ?? "APPLY_TARGET_CONFLICTED",
       card.originalTextHash ?? undefined,
       card.targetRange !== null || card.targetAnchor !== null,
       card.actionType
@@ -483,21 +592,56 @@ export function resolveApplyResult(card: ReviewCardViewModel, result: MockApplyR
       canApply: false,
       isSafeForApproveAll: false,
       pendingApplyCommand: null,
+      applyResponse: response,
+      applyDisplay: createDurableApplyDisplay(response),
       duplicateNotice: null
     };
   }
 
-  const statusLabel = result.status === PROPOSED_ACTION_STATUSES.APPLIED ? "Applied" : "Failed";
+  const status = response.result.status;
+  const statusLabel = getApplyStatusLabel(status);
 
   return {
     ...card,
-    status: result.status,
+    status,
     statusLabel,
     canApprove: false,
     canReject: false,
     canApply: false,
     isSafeForApproveAll: false,
     pendingApplyCommand: null,
+    applyResponse: response,
+    applyDisplay: createDurableApplyDisplay(response),
+    duplicateNotice: null
+  };
+}
+
+export function reconcileReviewCardStatusEvent(card: ReviewCardViewModel, event: ActionStatusChangedEvent): ReviewCardViewModel {
+  const actionId = event.actionId ?? event.payload?.actionId;
+  const status = event.status ?? event.payload?.status;
+  const reasonCode = event.reasonCode ?? event.payload?.reasonCode;
+
+  if (event.type !== "action.status_changed" || actionId !== card.actionId || !isProposedActionStatus(status)) {
+    return card;
+  }
+
+  const actionState = getProposedActionState({ actionId, status });
+  const conflict =
+    status === PROPOSED_ACTION_STATUSES.CONFLICTED
+      ? createConflictDisplayModel(reasonCode ?? "APPLY_TARGET_CONFLICTED", card.originalTextHash ?? undefined, true, card.actionType)
+      : card.conflict;
+
+  return {
+    ...card,
+    status,
+    statusLabel: actionState.label,
+    conflict,
+    canApprove: actionState.canApprove && conflict === null,
+    canReject: actionState.canReject,
+    canApply: actionState.canApply && conflict === null && card.pendingApplyCommand === null,
+    isSafeForApproveAll: actionState.canApprove && conflict === null,
+    pendingApplyCommand: null,
+    applyDisplay: createStatusEventDisplay(status, reasonCode),
     duplicateNotice: null
   };
 }
@@ -632,6 +776,104 @@ function withDuplicateNotice(card: ReviewCardViewModel, duplicateNotice: string)
     ...card,
     duplicateNotice
   };
+}
+
+function createDurableApplyDisplay(response: BackendApplyResponseView): ApplyDisplayModel {
+  const reasonCode = response.result?.conflictReasonCode ?? response.result?.failureCode;
+
+  if (response.result?.replayed === true) {
+    return {
+      kind: "DUPLICATE_REPLAY",
+      title: "Duplicate replay",
+      message: "The backend returned the stored terminal result. No duplicate document mutation occurred.",
+      code: reasonCode ?? null,
+      retryable: false
+    };
+  }
+
+  return createStatusEventDisplay(response.result?.status ?? PROPOSED_ACTION_STATUSES.FAILED, reasonCode);
+}
+
+function createStatusEventDisplay(status: ProposedActionStatus, reasonCode?: string): ApplyDisplayModel {
+  if (status === PROPOSED_ACTION_STATUSES.FAILED && isDeniedReasonCode(reasonCode)) {
+    return createSafeApplyDisplay({ category: "AUTHORIZATION", code: "AUTHORIZATION_DENIED", retryable: false });
+  }
+  if (status === PROPOSED_ACTION_STATUSES.FAILED && isReconnectReasonCode(reasonCode)) {
+    return createSafeApplyDisplay({ category: "OAUTH", code: reasonCode ?? "OAUTH_RECONNECT_REQUIRED", retryable: false });
+  }
+
+  switch (status) {
+    case PROPOSED_ACTION_STATUSES.APPLIED:
+      return {
+        kind: "DURABLE_RESULT",
+        title: "Applied",
+        message: "The backend reported the edit was applied once.",
+        code: reasonCode ?? null,
+        retryable: false
+      };
+    case PROPOSED_ACTION_STATUSES.CONFLICTED:
+      return {
+        kind: "DURABLE_RESULT",
+        title: "Conflict",
+        message: "The backend reported a conflict. No document mutation occurred.",
+        code: reasonCode ?? "APPLY_TARGET_CONFLICTED",
+        retryable: false
+      };
+    case PROPOSED_ACTION_STATUSES.EXPIRED:
+      return {
+        kind: "DURABLE_RESULT",
+        title: "Expired",
+        message: "The proposal expired. Generate a new proposal before applying.",
+        code: reasonCode ?? "ACTION_EXPIRED",
+        retryable: false
+      };
+    case PROPOSED_ACTION_STATUSES.FAILED:
+      return {
+        kind: "DURABLE_RESULT",
+        title: "Failed",
+        message: "The backend reported a safe apply failure.",
+        code: reasonCode ?? "APPLY_FAILED",
+        retryable: false
+      };
+    default:
+      return {
+        kind: "DURABLE_RESULT",
+        title: getApplyStatusLabel(status),
+        message: "The backend reported an action status update.",
+        code: reasonCode ?? null,
+        retryable: false
+      };
+  }
+}
+
+function createSafeApplyDisplay(error: NonNullable<BackendApplyResponseView["error"]>): ApplyDisplayModel {
+  const mapped: UserFacingError = mapUserFacingError(error);
+  const denied = isDeniedReasonCode(error.code) || error.category === "AUTHORIZATION";
+  const reconnectRequired = isReconnectReasonCode(error.code) || error.category === "OAUTH";
+
+  return {
+    kind: "SAFE_ERROR",
+    title: denied ? "Denied" : reconnectRequired ? "Reconnect required" : "Safe error",
+    message: mapped.message,
+    code: mapped.code,
+    retryable: error.retryable
+  };
+}
+
+function getApplyStatusLabel(status: ProposedActionStatus): string {
+  return getProposedActionState({ status }).label;
+}
+
+function isProposedActionStatus(status: string | undefined): status is ProposedActionStatus {
+  return status !== undefined && Object.values(PROPOSED_ACTION_STATUSES).includes(status as ProposedActionStatus);
+}
+
+function isDeniedReasonCode(reasonCode: string | undefined): boolean {
+  return reasonCode === "AUTHORIZATION_DENIED";
+}
+
+function isReconnectReasonCode(reasonCode: string | undefined): boolean {
+  return reasonCode === "OAUTH_RECONNECT_REQUIRED" || reasonCode === "RECONNECT_REQUIRED" || reasonCode === "TOKEN_EXPIRED";
 }
 
 function createConflictDisplayModel(

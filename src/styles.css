@@ -711,6 +711,27 @@ dd {
   font-size: 0.86rem;
 }
 
+.apply-result-box {
+  border: 1px solid #bfd3f5;
+  border-radius: 6px;
+  padding: 10px;
+  color: #17335f;
+  background: #f4f8ff;
+}
+
+.apply-result-box p {
+  margin: 4px 0;
+  overflow-wrap: anywhere;
+  font-size: 0.86rem;
+}
+
+.apply-result-box code {
+  display: inline-block;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  font-size: 0.78rem;
+}
+
 .command-box {
   align-items: center;
   justify-content: space-between;

@@ -13,6 +13,8 @@ import {
   createAssistantShellState,
   createContentScriptBridgeViewModel,
   createInitialMockChatState,
+  createMockApplyResponse,
+  createMockApplyResponseWithResult,
   createMockApplyResult,
   createReviewCardsFromFixtures,
   createSafeClientLogEvent,
@@ -21,9 +23,11 @@ import {
   mapReviewFixtureToCard,
   openAssistantShell,
   rejectReviewCard,
+  reconcileReviewCardStatusEvent,
   resolveApplyResult,
   safeLogExcludesForbiddenContent,
   submitMockChatMessage,
+  type BackendApplyResponseView,
   type ContractProposedActionReviewRef
 } from "../src/assistant-demo";
 
@@ -31,11 +35,17 @@ async function loadGoogleDocsContractFixtures(): Promise<{
   proposedActionFixtures: readonly { name: string; validator: string; value: ContractProposedActionReviewRef }[];
   validateActionDecisionCommandPayload: (value: unknown) => { valid: boolean; issues: readonly unknown[] };
   validateApplyActionCommandPayload: (value: unknown) => { valid: boolean; issues: readonly unknown[] };
+  validateHttpCommandResponse: (value: unknown) => { valid: boolean; issues: readonly unknown[] };
   validateProposedActionReviewRef: (value: unknown) => { valid: boolean; issues: readonly unknown[] };
   validateHttpCommandRequest: (value: unknown) => { valid: boolean; issues: readonly unknown[] };
+  applyActionCommandFixture: { value: { commandId: string; idempotencyKey: string } };
+  applyActionResultResponseFixtures: readonly { name: string; value: BackendApplyResponseView }[];
+  reconnectRequiredApplyResponseFixture: { value: BackendApplyResponseView };
 }> {
   // @ts-expect-error - sibling contract fixtures are JavaScript-only until contracts publish generated TypeScript types.
   const fixtures = await import("../../ai-assist-contracts/fixtures/google-docs-vertical-slice.fixtures.js");
+  // @ts-expect-error - sibling contract fixtures are JavaScript-only until contracts publish generated TypeScript types.
+  const proposedActions = await import("../../ai-assist-contracts/fixtures/proposed-actions.fixtures.js");
   // @ts-expect-error - sibling contract validators are JavaScript-only until contracts publish generated TypeScript types.
   const actions = await import("../../ai-assist-contracts/src/actions.js");
   // @ts-expect-error - sibling contract validators are JavaScript-only until contracts publish generated TypeScript types.
@@ -43,9 +53,13 @@ async function loadGoogleDocsContractFixtures(): Promise<{
 
   return {
     proposedActionFixtures: fixtures.proposedActionFixtures,
+    applyActionCommandFixture: proposedActions.applyActionCommandFixture,
+    applyActionResultResponseFixtures: proposedActions.applyActionResultResponseFixtures,
+    reconnectRequiredApplyResponseFixture: proposedActions.reconnectRequiredApplyResponseFixture,
     validateProposedActionReviewRef: actions.validateProposedActionReviewRef,
     validateActionDecisionCommandPayload: commands.validateActionDecisionCommandPayload,
     validateApplyActionCommandPayload: commands.validateApplyActionCommandPayload,
+    validateHttpCommandResponse: commands.validateHttpCommandResponse,
     validateHttpCommandRequest: commands.validateHttpCommandRequest
   };
 }
@@ -241,6 +255,181 @@ describe("Assistant demo helpers", () => {
     });
   });
 
+  it("renders backend apply responses for duplicate replay, expired, denied, reconnect-required, and safe errors", () => {
+    const createRequestedCard = () => applyReviewCard(approveReviewCard(mapReviewFixtureToCard(DEMO_REVIEW_FIXTURES[0])));
+    const resolveWithResult = (overrides: Parameters<typeof createMockApplyResponseWithResult>[1]) => {
+      const requested = createRequestedCard();
+      return resolveApplyResult(requested, createMockApplyResponseWithResult(requested, overrides));
+    };
+    const resolveWithError = (error: NonNullable<ReturnType<typeof createMockApplyResponse>["error"]>) => {
+      const requested = createRequestedCard();
+      return resolveApplyResult(
+        requested,
+        createMockApplyResponse(requested, {
+          status: "rejected",
+          result: undefined,
+          error
+        })
+      );
+    };
+    const duplicate = resolveWithResult({
+      replayed: true,
+      status: "APPLIED"
+    });
+    const expired = resolveWithResult({
+      status: "EXPIRED",
+      failureCode: "ACTION_EXPIRED"
+    });
+    const denied = resolveWithError({ category: "AUTHORIZATION", code: "AUTHORIZATION_DENIED", retryable: false });
+    const reconnect = resolveWithError({ category: "OAUTH", code: "OAUTH_RECONNECT_REQUIRED", retryable: false });
+    const safeError = resolveWithError({ category: "DEPENDENCY", code: "CONNECTOR_UNAVAILABLE", retryable: true });
+
+    expect(duplicate.applyDisplay).toMatchObject({
+      kind: "DUPLICATE_REPLAY",
+      title: "Duplicate replay"
+    });
+    expect(duplicate.applyDisplay?.message).toContain("No duplicate document mutation occurred.");
+    expect(expired).toMatchObject({ status: "EXPIRED", statusLabel: "Expired" });
+    expect(expired.applyDisplay).toMatchObject({ title: "Expired", code: "ACTION_EXPIRED" });
+    expect(denied).toMatchObject({ statusLabel: "Denied", canReject: false, canApply: false, pendingApplyCommand: null });
+    expect(denied.applyDisplay).toMatchObject({ kind: "SAFE_ERROR", title: "Denied", code: "AUTHORIZATION_DENIED" });
+    expect(reconnect).toMatchObject({ statusLabel: "Reconnect required", canReject: false, canApply: false, pendingApplyCommand: null });
+    expect(reconnect.applyDisplay).toMatchObject({ kind: "SAFE_ERROR", title: "Reconnect required", code: "OAUTH_RECONNECT_REQUIRED" });
+    expect(safeError.applyDisplay).toMatchObject({ kind: "SAFE_ERROR", title: "Safe error", code: "CONNECTOR_UNAVAILABLE", retryable: true });
+    expect(JSON.stringify([denied, reconnect, safeError])).not.toMatch(/oauth token|authorization header|raw document|selected text|action payload/i);
+  });
+
+  it("reconciles real contract-shaped apply HTTP response fixtures", async () => {
+    const {
+      applyActionCommandFixture,
+      applyActionResultResponseFixtures,
+      reconnectRequiredApplyResponseFixture,
+      validateHttpCommandResponse
+    } = await loadGoogleDocsContractFixtures();
+    const createContractPendingCard = (response: { commandId: string; result?: { actionId?: string; idempotencyKey?: string } }) => {
+      const actionId = response.result?.actionId ?? "action_proposed_action_demo";
+      const idempotencyKey = response.result?.idempotencyKey ?? applyActionCommandFixture.value.idempotencyKey;
+      const approved = approveReviewCard(
+        mapReviewFixtureToCard(
+          {
+            ...DEMO_REVIEW_FIXTURES[0],
+            actionId,
+            resourceRef: {
+              ...DEMO_REVIEW_FIXTURES[0].resourceRef,
+              resourceId: "gdoc_proposed_action_demo"
+            }
+          },
+          idempotencyKey
+        )
+      );
+      const requested = applyReviewCard(approved);
+      const pendingApplyCommand = {
+        ...requested.pendingApplyCommand!,
+        commandId: response.commandId
+      };
+
+      return {
+        ...requested,
+        pendingApplyCommand,
+        lastCommand: pendingApplyCommand
+      };
+    };
+    const byName = new Map(applyActionResultResponseFixtures.map((fixture) => [fixture.name, fixture.value]));
+    const appliedResponse = byName.get("action-apply-result-applied")!;
+    const replayResponse = byName.get("action-apply-result-duplicate-replay")!;
+    const conflictedResponse = byName.get("action-apply-result-conflict-no-mutation")!;
+    const failedResponse = byName.get("action-apply-result-failed")!;
+
+    for (const response of [appliedResponse, replayResponse, conflictedResponse, failedResponse, reconnectRequiredApplyResponseFixture.value]) {
+      expect(validateHttpCommandResponse(response)).toMatchObject({ valid: true, issues: [] });
+    }
+
+    expect(resolveApplyResult(createContractPendingCard(appliedResponse), appliedResponse).applyDisplay).toMatchObject({
+      title: "Applied"
+    });
+    expect(resolveApplyResult(createContractPendingCard(replayResponse), replayResponse).applyDisplay).toMatchObject({
+      kind: "DUPLICATE_REPLAY",
+      title: "Duplicate replay"
+    });
+    expect(resolveApplyResult(createContractPendingCard(conflictedResponse), conflictedResponse)).toMatchObject({
+      status: "CONFLICTED",
+      canApply: false
+    });
+    expect(resolveApplyResult(createContractPendingCard(failedResponse), failedResponse).applyDisplay).toMatchObject({
+      title: "Failed",
+      code: "CONNECTOR_OPERATION_FAILED"
+    });
+    expect(
+      resolveApplyResult(createContractPendingCard(reconnectRequiredApplyResponseFixture.value), reconnectRequiredApplyResponseFixture.value)
+    ).toMatchObject({
+      statusLabel: "Reconnect required",
+      canReject: false,
+      canApply: false,
+      applyDisplay: { title: "Reconnect required", code: "OAUTH_RECONNECT_REQUIRED" }
+    });
+  });
+
+  it("reconciles action.status_changed events into review cards", () => {
+    const approved = approveReviewCard(mapReviewFixtureToCard(DEMO_REVIEW_FIXTURES[0]));
+    const applied = reconcileReviewCardStatusEvent(approved, {
+      type: "action.status_changed",
+      eventId: "evt-action-applied",
+      createdAt: "2026-06-07T12:00:00.000Z",
+      payload: {
+        actionId: approved.actionId,
+        previousStatus: "APPROVED",
+        status: "APPLIED",
+        reasonCode: "APPLY_SUCCEEDED"
+      }
+    });
+    const conflicted = reconcileReviewCardStatusEvent(approved, {
+      type: "action.status_changed",
+      payload: {
+        actionId: approved.actionId,
+        previousStatus: "APPROVED",
+        status: "CONFLICTED",
+        reasonCode: "APPLY_TARGET_CONFLICTED"
+      }
+    });
+    const unrelated = reconcileReviewCardStatusEvent(approved, {
+      type: "action.status_changed",
+      payload: {
+        actionId: "other-action",
+        status: "FAILED"
+      }
+    });
+    const denied = reconcileReviewCardStatusEvent(approved, {
+      type: "action.status_changed",
+      payload: {
+        actionId: approved.actionId,
+        previousStatus: "APPROVED",
+        status: "FAILED",
+        reasonCode: "AUTHORIZATION_DENIED"
+      }
+    });
+    const reconnect = reconcileReviewCardStatusEvent(approved, {
+      type: "action.status_changed",
+      payload: {
+        actionId: approved.actionId,
+        previousStatus: "APPROVED",
+        status: "FAILED",
+        reasonCode: "OAUTH_RECONNECT_REQUIRED"
+      }
+    });
+
+    expect(applied).toMatchObject({ status: "APPLIED", canApply: false });
+    expect(applied.applyDisplay).toMatchObject({ title: "Applied", code: "APPLY_SUCCEEDED" });
+    expect(conflicted).toMatchObject({ status: "CONFLICTED", canApply: false });
+    expect(conflicted.conflict?.message).toContain("No document mutation occurred.");
+    expect(denied).toMatchObject({ status: "FAILED", canApply: false, applyDisplay: { title: "Denied", code: "AUTHORIZATION_DENIED" } });
+    expect(reconnect).toMatchObject({
+      status: "FAILED",
+      canApply: false,
+      applyDisplay: { title: "Reconnect required", code: "OAUTH_RECONNECT_REQUIRED" }
+    });
+    expect(unrelated).toBe(approved);
+  });
+
   it("handles duplicate approval, rejection, and apply attempts deterministically", () => {
     const proposed = mapReviewFixtureToCard(DEMO_REVIEW_FIXTURES[0]);
     const approved = approveReviewCard(proposed);
@@ -290,7 +479,7 @@ describe("Assistant demo helpers", () => {
   });
 
   it("redacts forbidden client log fields and preserves metadata-only fields", () => {
-    const event = createSafeClientLogEvent("m2.chat.submit", {
+    const event = createSafeClientLogEvent("assistant.chat.submit", {
       prompt: "raw prompt",
       documentText: "raw document",
       message: "raw selected text under a generic key",
@@ -316,5 +505,6 @@ describe("Assistant demo helpers", () => {
     expect(safeLogExcludesForbiddenContent(event)).toBe(true);
     expect(JSON.stringify(event)).not.toContain("raw prompt");
     expect(JSON.stringify(event)).not.toContain("raw document");
+    expect(event.eventName).not.toMatch(/m\d/i);
   });
 });

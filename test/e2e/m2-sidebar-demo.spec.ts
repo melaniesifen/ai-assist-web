@@ -22,8 +22,22 @@ test("Sidebar demo works in Firefox", async ({ page }) => {
   await firstReviewCard.getByRole("button", { name: "Apply" }).click();
   await expect(firstReviewCard.getByText("Apply requested")).toBeVisible();
   await expect(firstReviewCard.getByLabel("Last backend-shaped command")).toContainText("actions.apply");
-  await firstReviewCard.getByRole("button", { name: "Mock result" }).click();
-  await expect(firstReviewCard.getByText("Applied")).toBeVisible();
+  await firstReviewCard.getByRole("button", { name: "Applied result" }).click();
+  await expect(firstReviewCard.locator(".status-badge", { hasText: "Applied" })).toBeVisible();
+  await expect(firstReviewCard.getByText("The backend reported the edit was applied once.")).toBeVisible();
+
+  const insertReviewCard = page.getByRole("article").filter({ hasText: "action_review_insert" });
+  await insertReviewCard.getByRole("button", { name: "Approve" }).click();
+  await insertReviewCard.getByRole("button", { name: "Apply" }).click();
+  await insertReviewCard.getByRole("button", { name: "Duplicate replay" }).click();
+  await expect(insertReviewCard.locator(".apply-result-box").getByText("Duplicate replay")).toBeVisible();
+  await expect(insertReviewCard.getByText("No duplicate document mutation occurred.")).toBeVisible();
+
+  const approvedReviewCard = page.getByRole("article").filter({ hasText: "action_review_approved" });
+  await approvedReviewCard.getByRole("button", { name: "Apply" }).click();
+  await approvedReviewCard.getByRole("button", { name: "Denied" }).click();
+  await expect(approvedReviewCard.locator(".apply-result-box").getByText("Denied", { exact: true })).toBeVisible();
+  await expect(approvedReviewCard.getByText("AUTHORIZATION_DENIED")).toBeVisible();
 
   await expect(page.getByRole("status").filter({ hasText: "No document mutation occurred." }).first()).toBeVisible();
   await expect(page.getByText("The browser surface does not call provider APIs")).toBeVisible();

@@ -91,6 +91,15 @@ Relevant design sources: frontend, provider-key, command, SSE, context, proposed
 - [x] Firefox Playwright demo validation passes for the local M2 sidebar/side-panel harness.
 - [x] M6-T1b: Rename runtime assistant-demo module, exported helpers, fixture IDs, setup demo values, and product-facing README text from milestone labels to product-generic names.
 
+## M7 Safe Apply UI Progress
+
+- [x] M7-T5: Web apply UI sends backend-shaped apply requests with idempotency keys and never calls connector mutation APIs directly.
+- [x] M7-T5: Render applied, conflicted, failed, expired, denied, reconnect-required, duplicate replay, and safe error states from backend-shaped responses or status events.
+- [x] M7-T5: Reconcile durable HTTP apply responses and SSE `action.status_changed` events into review card state.
+- [x] M7-T5: Keep apply-state runtime names, CSS classes, and log-event names product-generic.
+- [x] M7-T5: Verify browser/client logs exclude OAuth tokens, provider keys, authorization headers, document text, selected text, prompts, model response bodies, action payload plaintext, screenshots, OCR, and accessibility trees.
+- [x] M7-T5: Run web unit tests, production build, and Firefox e2e checks for the browser-facing UI.
+
 ## E2E-Owned UI Validation
 
 - [ ] E2E-001: Validate first-run onboarding UI for login, Google connection, provider-key entry, provider validation result, and Google resource-session start.

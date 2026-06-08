@@ -11,11 +11,14 @@ import {
   createAssistantShellState,
   createContentScriptBridgeViewModel,
   createInitialMockChatState,
+  createMockApplyResponse,
+  createMockApplyResponseWithResult,
   createMockApplyResult,
   createReviewCardsFromFixtures,
   getApproveAllState,
   getAssistantDemoContextModeOptions,
   openAssistantShell,
+  reconcileReviewCardStatusEvent,
   rejectReviewCard,
   resolveApplyResult,
   submitMockChatMessage,
@@ -455,6 +458,14 @@ export function App(): ReactElement {
 
                 {card.duplicateNotice ? <p className="duplicate-note">{card.duplicateNotice}</p> : null}
 
+                {card.applyDisplay ? (
+                  <div className="apply-result-box" role="status">
+                    <strong>{card.applyDisplay.title}</strong>
+                    <p>{card.applyDisplay.message}</p>
+                    {card.applyDisplay.code ? <code>{card.applyDisplay.code}</code> : null}
+                  </div>
+                ) : null}
+
                 <div className="card-actions">
                   <button disabled={!card.canReject} onClick={() => updateCard(card.actionId, rejectReviewCard)} type="button">
                     Reject
@@ -470,7 +481,123 @@ export function App(): ReactElement {
                     onClick={() => updateCard(card.actionId, (current) => resolveApplyResult(current, createMockApplyResult(current)))}
                     type="button"
                   >
-                    Mock result
+                    Applied result
+                  </button>
+                  <button
+                    disabled={card.pendingApplyCommand === null}
+                    onClick={() =>
+                      updateCard(card.actionId, (current) =>
+                        resolveApplyResult(
+                          current,
+                          createMockApplyResponseWithResult(current, {
+                            status: "CONFLICTED",
+                            replayed: false,
+                            conflictReasonCode: "APPLY_TARGET_CONFLICTED"
+                          })
+                        )
+                      )
+                    }
+                    type="button"
+                  >
+                    Conflict result
+                  </button>
+                  <button
+                    disabled={card.pendingApplyCommand === null}
+                    onClick={() =>
+                      updateCard(card.actionId, (current) =>
+                        resolveApplyResult(
+                          current,
+                          createMockApplyResponseWithResult(current, {
+                            status: "FAILED",
+                            replayed: false,
+                            failureCode: "CONNECTOR_WRITE_FAILED"
+                          })
+                        )
+                      )
+                    }
+                    type="button"
+                  >
+                    Failed result
+                  </button>
+                  <button
+                    disabled={card.pendingApplyCommand === null}
+                    onClick={() =>
+                      updateCard(card.actionId, (current) =>
+                        resolveApplyResult(
+                          current,
+                          createMockApplyResponseWithResult(current, {
+                            status: "APPLIED",
+                            replayed: true
+                          })
+                        )
+                      )
+                    }
+                    type="button"
+                  >
+                    Duplicate replay
+                  </button>
+                  <button
+                    disabled={card.pendingApplyCommand === null}
+                    onClick={() =>
+                      updateCard(card.actionId, (current) =>
+                        resolveApplyResult(
+                          current,
+                          createMockApplyResponse(current, {
+                            status: "rejected",
+                            result: undefined,
+                            error: {
+                              category: "AUTHORIZATION",
+                              code: "AUTHORIZATION_DENIED",
+                              retryable: false
+                            }
+                          })
+                        )
+                      )
+                    }
+                    type="button"
+                  >
+                    Denied
+                  </button>
+                  <button
+                    disabled={card.pendingApplyCommand === null}
+                    onClick={() =>
+                      updateCard(card.actionId, (current) =>
+                        resolveApplyResult(
+                          current,
+                          createMockApplyResponse(current, {
+                            status: "rejected",
+                            result: undefined,
+                            error: {
+                              category: "OAUTH",
+                              code: "OAUTH_RECONNECT_REQUIRED",
+                              retryable: false
+                            }
+                          })
+                        )
+                      )
+                    }
+                    type="button"
+                  >
+                    Reconnect required
+                  </button>
+                  <button
+                    onClick={() =>
+                      updateCard(card.actionId, (current) =>
+                        reconcileReviewCardStatusEvent(current, {
+                          type: "action.status_changed",
+                          eventId: `evt-${current.actionId}-expired`,
+                          payload: {
+                            actionId: current.actionId,
+                            previousStatus: current.status,
+                            status: "EXPIRED",
+                            reasonCode: "ACTION_EXPIRED"
+                          }
+                        })
+                      )
+                    }
+                    type="button"
+                  >
+                    Expired event
                   </button>
                 </div>
               </article>
