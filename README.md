@@ -10,13 +10,13 @@ safe-error behavior in pure TypeScript helpers with unit tests.
 
 - `index.html`: Vite HTML entrypoint.
 - `src/main.tsx`: React root renderer.
-- `src/App.tsx`: sidebar/side-panel M2 demo shell using the tested state helpers.
+- `src/App.tsx`: sidebar/side-panel assistant demo shell using the tested state helpers.
 - `src/onboarding-state.ts`: onboarding step derivation for auth, Google,
   provider setup, and resource session readiness.
 - `src/context-modes.ts`: context mode labels and availability state.
 - `src/provider-setup.ts`: provider credential setup state for OpenAI,
   Anthropic, and future Bedrock mode.
-- `src/setup-state.ts`: M3 first-run setup state mapping for product session,
+- `src/setup-state.ts`: First-run setup state mapping for product session,
   Google OAuth, provider-secret readiness, resource-session readiness, safe
   setup errors, and metadata-only setup log events.
 - `src/context-readiness.ts`: Google Docs read-path readiness state mapping for
@@ -27,7 +27,7 @@ safe-error behavior in pure TypeScript helpers with unit tests.
 - `src/extension-surface.ts`: Google Docs browser-extension MVP surface
   contract for page support, document ID detection, backend ownership, and safe
   user-facing states.
-- `src/m2-assistant-demo.ts`: local M2 side-panel demo helpers for content-script
+- `src/assistant-demo.ts`: local side-panel demo helpers for content-script
   bridge metadata, mocked chat state, PR-style review cards, approve/reject,
   approve-all, backend-shaped apply requests, and mocked apply results.
 - `src/error-mapping.ts`: safe error category/code to user-message mapping.
@@ -83,15 +83,15 @@ approval/rejection, idempotent apply-action, and status events. Extension code
 must not call OpenAI, Anthropic, Google mutation APIs, secret storage, or direct
 OAuth token endpoints.
 
-## M2 Local Side-Panel Demo
+## Local Side-Panel Demo
 
-The local M2 demo uses the sidebar/side-panel as the primary UI surface. It
+The local demo uses the sidebar/side-panel as the primary UI surface. It
 models a Google Docs content-script bridge for document metadata, keeps mocked
 chat state in active visible UI state, renders PR-style proposed-edit cards, and
 supports approve, reject, approve-all, and apply controls.
 
-The non-demo M2 web-side work is implemented and covered by unit tests. The
-remaining M2 validation step is the user-owned local browser demo.
+The non-demo web-side work is implemented and covered by unit tests. The
+remaining local validation step is the user-owned browser demo.
 
 Apply does not mark an action applied from a client click. The Apply control
 creates a backend-shaped `actions.apply` command with an idempotency key. A
@@ -99,7 +99,7 @@ separate mocked backend-shaped result transitions the card to `APPLIED`,
 `FAILED`, or `CONFLICTED`.
 
 Runtime demo data stays contract-compatible without importing sibling fixtures
-into the browser bundle. Tests import and validate the real M1 fixtures from
+into the browser bundle. Tests import and validate the real Google Docs vertical-slice fixtures from
 `ai-assist-contracts`.
 
 `src/extension-surface.ts` exposes typed user-facing states:
@@ -110,14 +110,14 @@ into the browser bundle. Tests import and validate the real M1 fixtures from
 - `MISSING_DOCUMENT_ID`: Google Docs page shape is recognized, but no usable
   document ID is available.
 
-## M3 First-Run Setup Harness
+## First-Run Setup Harness
 
-The local app also renders backend-shaped first-run setup states for M3. The
-setup harness covers product-session status, Google OAuth status,
+The local app also renders backend-shaped first-run setup states. The setup
+harness covers product-session status, Google OAuth status,
 provider-secret readiness, resource-session readiness, safe user-facing errors,
 and the default `SELECTION` context posture.
 
-Tests import the real M3 setup fixtures from `ai-assist-contracts` and map them
+Tests import the real setup fixtures from `ai-assist-contracts` and map them
 through `src/setup-state.ts`. Runtime demo data remains local so the browser
 bundle does not depend on a sibling repo fixture path. Setup log payloads contain
 only metadata such as statuses, providers, update time, and error kinds.

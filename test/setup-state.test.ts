@@ -13,13 +13,13 @@ import {
   type FirstRunSetupStatus
 } from "../src/setup-state";
 
-async function loadM3ContractFixtures(): Promise<{
+async function loadFirstRunSetupContractFixtures(): Promise<{
   firstRunSetupReadyFixture: { value: FirstRunSetupStatus };
   firstRunSetupNeedsUserActionFixture: { value: FirstRunSetupStatus };
   validateFirstRunSetupStatus: (value: unknown) => { valid: boolean; issues: readonly unknown[] };
 }> {
   // @ts-expect-error - sibling contract fixtures are JavaScript-only until contracts publish generated TypeScript types.
-  const fixtures = await import("../../ai-assist-contracts/fixtures/m3-first-run-setup.fixtures.js");
+  const fixtures = await import("../../ai-assist-contracts/fixtures/first-run-setup.fixtures.js");
   // @ts-expect-error - sibling contract validators are JavaScript-only until contracts publish generated TypeScript types.
   const setup = await import("../../ai-assist-contracts/src/setup.js");
 
@@ -30,13 +30,13 @@ async function loadM3ContractFixtures(): Promise<{
   };
 }
 
-describe("M3 first-run setup state", () => {
+describe("First-run setup state", () => {
   it("maps real M3 contract fixtures into setup view models", async () => {
     const {
       firstRunSetupReadyFixture,
       firstRunSetupNeedsUserActionFixture,
       validateFirstRunSetupStatus
-    } = await loadM3ContractFixtures();
+    } = await loadFirstRunSetupContractFixtures();
 
     expect(validateFirstRunSetupStatus(firstRunSetupReadyFixture.value)).toMatchObject({ valid: true, issues: [] });
     expect(validateFirstRunSetupStatus(firstRunSetupNeedsUserActionFixture.value)).toMatchObject({
@@ -69,8 +69,8 @@ describe("M3 first-run setup state", () => {
         {
           provider: "OPENAI",
           status: PROVIDER_SECRET_READINESS_STATUSES.VALID,
-          secretId: "secret_m3_openai",
-          fingerprint: "fp_m3_openai",
+          secretId: "secret_setup_openai",
+          fingerprint: "fp_setup_openai",
           expiresAt: "2026-06-07T02:00:00.000Z"
         }
       ]
@@ -96,7 +96,7 @@ describe("M3 first-run setup state", () => {
     expect(createFirstRunSetupViewModel(validCoverageStatus).providerSecrets[0].status).toBe("Valid");
   });
 
-  it("renders local M3 demo states for ready and needs-action setup", () => {
+  it("renders local setup demo states for ready and needs-action setup", () => {
     const viewModels = createSetupDemoStates().map(createFirstRunSetupViewModel);
 
     expect(viewModels).toHaveLength(2);
@@ -124,15 +124,15 @@ describe("M3 first-run setup state", () => {
     const status: FirstRunSetupStatus = {
       productSession: {
         status: PRODUCT_SESSION_STATUSES.AUTHENTICATED,
-        tenantId: "tenant_m3_demo",
-        userId: "user_m3_demo",
-        authSubject: "auth_subject_m3_demo",
-        sessionId: "session_m3_demo"
+        tenantId: "tenant_setup_demo",
+        userId: "user_setup_demo",
+        authSubject: "auth_subject_setup_demo",
+        sessionId: "session_setup_demo"
       },
       googleOAuth: {
         provider: "google",
         status: GOOGLE_OAUTH_CONNECTION_STATUSES.CONNECTED,
-        googleAccountId: "google_account_m3_demo",
+        googleAccountId: "google_account_setup_demo",
         scopes: ["https://www.googleapis.com/auth/documents"]
       },
       providerSecrets: [
@@ -141,8 +141,8 @@ describe("M3 first-run setup state", () => {
         {
           provider: "OPENAI",
           status: PROVIDER_SECRET_READINESS_STATUSES.VALID,
-          secretId: "secret_m3_demo",
-          fingerprint: "fp_m3_demo",
+          secretId: "secret_setup_demo",
+          fingerprint: "fp_setup_demo",
           expiresAt: "2026-06-07T02:00:00.000Z"
         },
         { provider: "OPENAI", status: PROVIDER_SECRET_READINESS_STATUSES.INVALID },
@@ -164,7 +164,7 @@ describe("M3 first-run setup state", () => {
       "Expired",
       "Validation failed"
     ]);
-    expect(JSON.stringify(viewModel)).not.toContain("secret_m3_demo");
+    expect(JSON.stringify(viewModel)).not.toContain("secret_setup_demo");
   });
 
   it("keeps setup log payloads metadata-only even when backend errors include sensitive values", () => {

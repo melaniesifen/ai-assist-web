@@ -3,7 +3,7 @@ import { describeGoogleDocsExtensionSurface } from "./extension-surface";
 import {
   DEMO_DOCUMENT_URL,
   DEMO_REVIEW_FIXTURES,
-  M2_SESSION_ID,
+  ASSISTANT_DEMO_SESSION_ID,
   applyReviewCard,
   approveAllReviewCards,
   approveReviewCard,
@@ -14,14 +14,14 @@ import {
   createMockApplyResult,
   createReviewCardsFromFixtures,
   getApproveAllState,
-  getM2ContextModeOptions,
+  getAssistantDemoContextModeOptions,
   openAssistantShell,
   rejectReviewCard,
   resolveApplyResult,
   submitMockChatMessage,
   type AssistantShellState,
   type ReviewCardViewModel
-} from "./m2-assistant-demo";
+} from "./assistant-demo";
 import {
   createFirstRunSetupViewModel,
   createSetupDemoStates,
@@ -74,7 +74,7 @@ export function App(): ReactElement {
   );
   const sessionStreamFrames = useMemo(createSessionStreamDemoFrames, []);
   const acceptedCommand = useMemo(createAcceptedCommandView, []);
-  const contextModes = getM2ContextModeOptions();
+  const contextModes = getAssistantDemoContextModeOptions();
   const approveAllState = getApproveAllState(reviewCards);
   const selectedContextMode = contextModes.find((mode) => mode.mode === "SELECTION");
   const activeResourceMode = contextModes.find((mode) => mode.mode === "ACTIVE_RESOURCE");
@@ -141,7 +141,7 @@ export function App(): ReactElement {
         <section className="setup-harness" aria-label="First-run setup harness">
           <header className="setup-header">
             <div>
-              <p className="eyebrow">M3 first-run setup</p>
+              <p className="eyebrow">First-run setup</p>
               <h2>Backend-shaped setup states</h2>
             </div>
             <span className="context-pill">Default context: SELECTION</span>
@@ -153,7 +153,7 @@ export function App(): ReactElement {
             ))}
           </div>
 
-          <section className="setup-coverage" aria-label="M3 setup status coverage">
+          <section className="setup-coverage" aria-label="First-run setup status coverage">
             <h3>Status coverage</h3>
             <ul>
               {setupCoverageLabels.map((label) => (
@@ -163,10 +163,10 @@ export function App(): ReactElement {
           </section>
         </section>
 
-        <section className="context-readiness-harness" aria-label="M4 Google Docs read-path readiness">
+        <section className="context-readiness-harness" aria-label="Google Docs read-path readiness">
           <header className="setup-header">
             <div>
-              <p className="eyebrow">M4 Google Docs read path</p>
+              <p className="eyebrow">Google Docs read path</p>
               <h2>Context readiness and consent states</h2>
             </div>
             <span className="context-pill">Modes: SELECTION + ACTIVE_RESOURCE</span>
@@ -321,7 +321,7 @@ export function App(): ReactElement {
               </div>
               <div>
                 <dt>Session</dt>
-                <dd>{M2_SESSION_ID}</dd>
+                <dd>{ASSISTANT_DEMO_SESSION_ID}</dd>
               </div>
               <div>
                 <dt>Context</dt>

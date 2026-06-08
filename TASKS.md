@@ -79,6 +79,7 @@ Relevant design sources: frontend, provider-key, command, SSE, context, proposed
 - [x] Keep the M2 primary UI as a browser sidebar/side-panel, with floating in-document affordances deferred.
 - [x] Cover approve, reject, approve-all safety, duplicate handling, apply idempotency keys, conflict states, and safe logging in unit tests.
 - [x] Firefox Playwright demo validation passes for the local M2 sidebar/side-panel harness.
+- [x] M6-T1b: Rename runtime assistant-demo module, exported helpers, fixture IDs, setup demo values, and product-facing README text from milestone labels to product-generic names.
 
 ## E2E-Owned UI Validation
 

@@ -3,7 +3,7 @@ import { CONTEXT_MODE_IDS } from "../src/context-modes";
 import { PROPOSED_ACTION_STATUSES } from "../src/proposed-actions";
 import {
   DEMO_REVIEW_FIXTURES,
-  M2_SESSION_ID,
+  ASSISTANT_DEMO_SESSION_ID,
   OVERLAPPING_REVIEW_FIXTURES,
   applyReviewCard,
   approveAllReviewCards,
@@ -17,17 +17,17 @@ import {
   createReviewCardsFromFixtures,
   createSafeClientLogEvent,
   getApproveAllState,
-  getM2ContextModeOptions,
-  mapM1ReviewFixtureToCard,
+  getAssistantDemoContextModeOptions,
+  mapReviewFixtureToCard,
   openAssistantShell,
   rejectReviewCard,
   resolveApplyResult,
   safeLogExcludesForbiddenContent,
   submitMockChatMessage,
   type ContractProposedActionReviewRef
-} from "../src/m2-assistant-demo";
+} from "../src/assistant-demo";
 
-async function loadM1ContractFixtures(): Promise<{
+async function loadGoogleDocsContractFixtures(): Promise<{
   proposedActionFixtures: readonly { name: string; validator: string; value: ContractProposedActionReviewRef }[];
   validateActionDecisionCommandPayload: (value: unknown) => { valid: boolean; issues: readonly unknown[] };
   validateApplyActionCommandPayload: (value: unknown) => { valid: boolean; issues: readonly unknown[] };
@@ -35,7 +35,7 @@ async function loadM1ContractFixtures(): Promise<{
   validateHttpCommandRequest: (value: unknown) => { valid: boolean; issues: readonly unknown[] };
 }> {
   // @ts-expect-error - sibling contract fixtures are JavaScript-only until contracts publish generated TypeScript types.
-  const fixtures = await import("../../ai-assist-contracts/fixtures/m1-google-docs-vertical-slice.fixtures.js");
+  const fixtures = await import("../../ai-assist-contracts/fixtures/google-docs-vertical-slice.fixtures.js");
   // @ts-expect-error - sibling contract validators are JavaScript-only until contracts publish generated TypeScript types.
   const actions = await import("../../ai-assist-contracts/src/actions.js");
   // @ts-expect-error - sibling contract validators are JavaScript-only until contracts publish generated TypeScript types.
@@ -50,9 +50,9 @@ async function loadM1ContractFixtures(): Promise<{
   };
 }
 
-describe("M2 assistant demo helpers", () => {
+describe("Assistant demo helpers", () => {
   it("maps real M1 contract fixtures into review-card view models", async () => {
-    const { proposedActionFixtures, validateProposedActionReviewRef } = await loadM1ContractFixtures();
+    const { proposedActionFixtures, validateProposedActionReviewRef } = await loadGoogleDocsContractFixtures();
     const reviewFixtures = proposedActionFixtures.filter((fixture) => fixture.validator === "validateProposedActionReviewRef");
 
     expect(reviewFixtures.length).toBeGreaterThanOrEqual(5);
@@ -63,9 +63,9 @@ describe("M2 assistant demo helpers", () => {
     const proposed = reviewFixtures.find((fixture) => fixture.name === "action-review-proposed-diff-card");
     expect(proposed).toBeDefined();
 
-    const card = mapM1ReviewFixtureToCard(proposed!.value, "idem-fixture");
+    const card = mapReviewFixtureToCard(proposed!.value, "idem-fixture");
 
-    expect(card.actionId).toBe("action_m1_review");
+    expect(card.actionId).toBe("action_review_replace");
     expect(card.status).toBe("PROPOSED");
     expect(card.targetText).toBe("<fixture current text>");
     expect(card.replacementText).toBe("<fixture proposed text>");
@@ -73,12 +73,12 @@ describe("M2 assistant demo helpers", () => {
     expect(card.rationale).toBe("Clarify the selected sentence.");
     expect(card.idempotencyKey).toBe("idem-fixture");
     expect(card.targetRange).toEqual({ start: 42, end: 64 });
-    expect(card.originalTextHash).toBe("sha256:m1-original");
+    expect(card.originalTextHash).toBe("sha256:google-docs-original");
   });
 
   it("keeps runtime demo fixtures compatible with the proposed-action review contract shape", async () => {
-    const { validateProposedActionReviewRef } = await loadM1ContractFixtures();
-    const card = mapM1ReviewFixtureToCard(DEMO_REVIEW_FIXTURES[0], "idem-runtime");
+    const { validateProposedActionReviewRef } = await loadGoogleDocsContractFixtures();
+    const card = mapReviewFixtureToCard(DEMO_REVIEW_FIXTURES[0], "idem-runtime");
 
     for (const fixture of DEMO_REVIEW_FIXTURES) {
       expect(validateProposedActionReviewRef(fixture)).toMatchObject({ valid: true, issues: [] });
@@ -89,27 +89,27 @@ describe("M2 assistant demo helpers", () => {
   });
 
   it("keeps valid anchor-targeted review refs approvable", async () => {
-    const { validateProposedActionReviewRef } = await loadM1ContractFixtures();
+    const { validateProposedActionReviewRef } = await loadGoogleDocsContractFixtures();
     const anchoredFixture: ContractProposedActionReviewRef = {
       ...DEMO_REVIEW_FIXTURES[0],
-      actionId: "action_m2_anchor_target",
+      actionId: "action_review_anchor_target",
       target: {
         targetAnchor: {
           connector: "google_docs",
-          anchorId: "anchor_m2_demo",
-          resourceRevision: "rev_m1"
+          anchorId: "anchor_review_demo",
+          resourceRevision: "rev_google_docs"
         }
       }
     };
 
-    const card = mapM1ReviewFixtureToCard(anchoredFixture);
+    const card = mapReviewFixtureToCard(anchoredFixture);
 
     expect(validateProposedActionReviewRef(anchoredFixture)).toMatchObject({ valid: true, issues: [] });
     expect(card.targetRange).toBeNull();
     expect(card.targetAnchor).toEqual({
       connector: "google_docs",
-      anchorId: "anchor_m2_demo",
-      resourceRevision: "rev_m1"
+      anchorId: "anchor_review_demo",
+      resourceRevision: "rev_google_docs"
     });
     expect(card.conflict).toBeNull();
     expect(card.canApprove).toBe(true);
@@ -117,21 +117,21 @@ describe("M2 assistant demo helpers", () => {
   });
 
   it("does not treat mixed target variants as connector-verified", async () => {
-    const { validateProposedActionReviewRef } = await loadM1ContractFixtures();
+    const { validateProposedActionReviewRef } = await loadGoogleDocsContractFixtures();
     const mixedTargetFixture: ContractProposedActionReviewRef = {
       ...DEMO_REVIEW_FIXTURES[0],
-      actionId: "action_m2_mixed_target",
+      actionId: "action_review_mixed_target",
       target: {
         targetRange: { start: 42, end: 64 },
         targetAnchor: {
           connector: "google_docs",
-          anchorId: "anchor_m2_demo",
-          resourceRevision: "rev_m1"
+          anchorId: "anchor_review_demo",
+          resourceRevision: "rev_google_docs"
         }
       }
     };
 
-    const card = mapM1ReviewFixtureToCard(mixedTargetFixture);
+    const card = mapReviewFixtureToCard(mixedTargetFixture);
 
     expect(validateProposedActionReviewRef(mixedTargetFixture).valid).toBe(false);
     expect(card.conflict?.reasonCode).toBe("UNVERIFIABLE_TARGET");
@@ -145,15 +145,15 @@ describe("M2 assistant demo helpers", () => {
 
     expect(ready).toMatchObject({ panelAvailable: true, panelOpen: true });
     expect(ready.bridge).toMatchObject({
-      documentId: "gdoc_m1_demo",
+      documentId: "gdoc_google_docs_demo",
       source: "GOOGLE_DOCS_CONTENT_SCRIPT"
     });
     expect(unsupported).toMatchObject({ panelAvailable: false, panelOpen: false });
     expect(openAssistantShell(closed)).toMatchObject({ panelAvailable: true, panelOpen: true });
   });
 
-  it("defaults M2 to selection and active-resource MVP modes while disabling future modes", () => {
-    const options = getM2ContextModeOptions();
+  it("defaults assistant demo to selection and active-resource MVP modes while disabling future modes", () => {
+    const options = getAssistantDemoContextModeOptions();
 
     expect(options.find((option) => option.mode === CONTEXT_MODE_IDS.SELECTION)?.enabled).toBe(true);
     expect(options.find((option) => option.mode === CONTEXT_MODE_IDS.ACTIVE_RESOURCE)?.enabled).toBe(true);
@@ -170,9 +170,9 @@ describe("M2 assistant demo helpers", () => {
       PROPOSED_ACTION_STATUSES.FAILED,
       PROPOSED_ACTION_STATUSES.EXPIRED
     ].map((status) =>
-      mapM1ReviewFixtureToCard({
+      mapReviewFixtureToCard({
         ...DEMO_REVIEW_FIXTURES[0],
-        actionId: `action_m2_${status.toLowerCase()}`,
+        actionId: `action_review_${status.toLowerCase()}`,
         status
       })
     );
@@ -190,9 +190,9 @@ describe("M2 assistant demo helpers", () => {
       validateActionDecisionCommandPayload,
       validateApplyActionCommandPayload,
       validateHttpCommandRequest
-    } = await loadM1ContractFixtures();
+    } = await loadGoogleDocsContractFixtures();
     const contractApply = proposedActionFixtures.find((fixture) => fixture.name === "action-command-apply-idempotent");
-    const proposed = mapM1ReviewFixtureToCard(DEMO_REVIEW_FIXTURES[0]);
+    const proposed = mapReviewFixtureToCard(DEMO_REVIEW_FIXTURES[0]);
     const approved = approveReviewCard(proposed);
     const rejected = rejectReviewCard(proposed);
     const applyRequested = applyReviewCard(approved);
@@ -202,16 +202,16 @@ describe("M2 assistant demo helpers", () => {
     expect(approved.status).toBe("APPROVED");
     expect(approved.lastCommand).toMatchObject({
       commandType: "actions.approve",
-      payload: { sessionId: M2_SESSION_ID, actionId: proposed.actionId, reasonCode: "USER_APPROVED" }
+      payload: { sessionId: ASSISTANT_DEMO_SESSION_ID, actionId: proposed.actionId, reasonCode: "USER_APPROVED" }
     });
     expect(rejected.status).toBe("REJECTED");
     expect(rejected.lastCommand).toMatchObject({
       commandType: "actions.reject",
-      payload: { sessionId: M2_SESSION_ID, actionId: proposed.actionId, reasonCode: "USER_REJECTED" }
+      payload: { sessionId: ASSISTANT_DEMO_SESSION_ID, actionId: proposed.actionId, reasonCode: "USER_REJECTED" }
     });
     expect(applyRequested.status).toBe("APPROVED");
     expect(applyRequested.pendingApplyCommand).toEqual(createApplyActionCommand(proposed.actionId, proposed.idempotencyKey));
-    expect(applyRequested.lastCommand?.idempotencyKey).toBe(`idem_m2_apply_${proposed.actionId}`);
+    expect(applyRequested.lastCommand?.idempotencyKey).toBe(`idem_apply_${proposed.actionId}`);
     expect(validateHttpCommandRequest(approved.lastCommand)).toMatchObject({ valid: true, issues: [] });
     expect(validateActionDecisionCommandPayload(approved.lastCommand?.payload)).toMatchObject({ valid: true, issues: [] });
     expect(validateHttpCommandRequest(rejected.lastCommand)).toMatchObject({ valid: true, issues: [] });
@@ -221,8 +221,8 @@ describe("M2 assistant demo helpers", () => {
   });
 
   it("transitions to terminal apply states only from mocked backend-shaped results", () => {
-    const requested = applyReviewCard(approveReviewCard(mapM1ReviewFixtureToCard(DEMO_REVIEW_FIXTURES[0])));
-    const approvedWithoutRequest = approveReviewCard(mapM1ReviewFixtureToCard(DEMO_REVIEW_FIXTURES[1]));
+    const requested = applyReviewCard(approveReviewCard(mapReviewFixtureToCard(DEMO_REVIEW_FIXTURES[0])));
+    const approvedWithoutRequest = approveReviewCard(mapReviewFixtureToCard(DEMO_REVIEW_FIXTURES[1]));
     const applied = resolveApplyResult(requested, createMockApplyResult(requested, PROPOSED_ACTION_STATUSES.APPLIED));
     const failed = resolveApplyResult(requested, createMockApplyResult(requested, PROPOSED_ACTION_STATUSES.FAILED));
     const conflicted = resolveApplyResult(
@@ -242,7 +242,7 @@ describe("M2 assistant demo helpers", () => {
   });
 
   it("handles duplicate approval, rejection, and apply attempts deterministically", () => {
-    const proposed = mapM1ReviewFixtureToCard(DEMO_REVIEW_FIXTURES[0]);
+    const proposed = mapReviewFixtureToCard(DEMO_REVIEW_FIXTURES[0]);
     const approved = approveReviewCard(proposed);
     const rejected = rejectReviewCard(proposed);
     const applyRequested = applyReviewCard(approved);
@@ -298,7 +298,7 @@ describe("M2 assistant demo helpers", () => {
       ocrText: "raw OCR text",
       actionPayload: { proposedText: "secret" },
       provider: "openai",
-      actionId: "action_m1_review",
+      actionId: "action_review_replace",
       durationMs: 12
     });
 
@@ -310,7 +310,7 @@ describe("M2 assistant demo helpers", () => {
       ocrText: "[redacted]",
       actionPayload: "[redacted]",
       provider: "openai",
-      actionId: "action_m1_review",
+      actionId: "action_review_replace",
       durationMs: 12
     });
     expect(safeLogExcludesForbiddenContent(event)).toBe(true);

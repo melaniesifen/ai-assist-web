@@ -14,7 +14,7 @@ import {
   type ContextReadinessInput
 } from "../src/context-readiness";
 
-async function loadM4ContractFixtures(): Promise<{
+async function loadGoogleDocsReadPathContractFixtures(): Promise<{
   consentErrorFixtures: readonly { value: ContractErrorRef }[];
   googleOAuthReconnectRequiredFixture: { value: GoogleOAuthStatusRef };
   googleDocsReadPathConnectorFixtures: readonly { name: string; value: ConnectorResponseRef }[];
@@ -25,32 +25,32 @@ async function loadM4ContractFixtures(): Promise<{
   // @ts-expect-error - sibling contract fixtures are JavaScript-only until contracts publish generated TypeScript types.
   const fixtures = await import("../../ai-assist-contracts/fixtures/google-docs-read-path.fixtures.js");
   // @ts-expect-error - sibling contract fixtures are JavaScript-only until contracts publish generated TypeScript types.
-  const m1Fixtures = await import("../../ai-assist-contracts/fixtures/m1-google-docs-vertical-slice.fixtures.js");
+  const googleDocsFixtures = await import("../../ai-assist-contracts/fixtures/google-docs-vertical-slice.fixtures.js");
   // @ts-expect-error - sibling contract fixtures are JavaScript-only until contracts publish generated TypeScript types.
-  const m3Fixtures = await import("../../ai-assist-contracts/fixtures/m3-first-run-setup.fixtures.js");
+  const setupFixtures = await import("../../ai-assist-contracts/fixtures/first-run-setup.fixtures.js");
   // @ts-expect-error - sibling contract validators are JavaScript-only until contracts publish generated TypeScript types.
   const connectors = await import("../../ai-assist-contracts/src/connectors.js");
   // @ts-expect-error - sibling contract validators are JavaScript-only until contracts publish generated TypeScript types.
   const context = await import("../../ai-assist-contracts/src/context.js");
 
   return {
-    consentErrorFixtures: m1Fixtures.consentErrorFixtures,
-    googleOAuthReconnectRequiredFixture: m3Fixtures.googleOAuthReconnectRequiredFixture,
+    consentErrorFixtures: googleDocsFixtures.consentErrorFixtures,
+    googleOAuthReconnectRequiredFixture: setupFixtures.googleOAuthReconnectRequiredFixture,
     googleDocsReadPathConnectorFixtures: fixtures.googleDocsReadPathConnectorFixtures,
-    normalizedContextFixtures: m1Fixtures.normalizedContextFixtures,
+    normalizedContextFixtures: googleDocsFixtures.normalizedContextFixtures,
     validateConnectorResponse: connectors.validateConnectorResponse,
     validateNormalizedContext: context.validateNormalizedContext
   };
 }
 
-describe("M4 Google Docs read-path readiness", () => {
+describe("Google Docs read-path readiness", () => {
   it("maps shared SELECTION and ACTIVE_RESOURCE read-context fixtures into metadata-only view models", async () => {
     const {
       googleDocsReadPathConnectorFixtures,
       normalizedContextFixtures,
       validateConnectorResponse,
       validateNormalizedContext
-    } = await loadM4ContractFixtures();
+    } = await loadGoogleDocsReadPathContractFixtures();
     const selectionResponse = googleDocsReadPathConnectorFixtures.find(
       (fixture) => fixture.name === "connector-google-docs-read-selection-success"
     )?.value;
@@ -95,8 +95,8 @@ describe("M4 Google Docs read-path readiness", () => {
     expect(selection.contextLabel).toBe("Selection");
     expect(selection.metadata).toEqual(
       expect.arrayContaining([
-        { label: "Content hash", value: "sha256:m1-selection" },
-        { label: "Revision", value: "rev_m1" },
+        { label: "Content hash", value: "sha256:google-docs-selection" },
+        { label: "Revision", value: "rev_google_docs" },
         { label: "Provenance", value: "connector verified" },
         { label: "Truncated", value: "false" }
       ])
@@ -105,7 +105,7 @@ describe("M4 Google Docs read-path readiness", () => {
     expect(activeResource.contextLabel).toBe("Active resource");
     expect(activeResource.metadata).toEqual(
       expect.arrayContaining([
-        { label: "Content hash", value: "sha256:m1-active-resource" },
+        { label: "Content hash", value: "sha256:google-docs-active-resource" },
         { label: "Source", value: "connector_resource_excerpt" }
       ])
     );
@@ -120,7 +120,7 @@ describe("M4 Google Docs read-path readiness", () => {
   });
 
   it("renders active, missing, revoked, and expired consent states before connector calls", async () => {
-    const { consentErrorFixtures } = await loadM4ContractFixtures();
+    const { consentErrorFixtures } = await loadGoogleDocsReadPathContractFixtures();
     const [missing, revoked, expired] = consentErrorFixtures;
     const inputs: readonly ContextReadinessInput[] = [
       {
@@ -161,7 +161,7 @@ describe("M4 Google Docs read-path readiness", () => {
   });
 
   it("maps reconnect-required and permission failures to safe user messages", async () => {
-    const { googleOAuthReconnectRequiredFixture, googleDocsReadPathConnectorFixtures } = await loadM4ContractFixtures();
+    const { googleOAuthReconnectRequiredFixture, googleDocsReadPathConnectorFixtures } = await loadGoogleDocsReadPathContractFixtures();
     const permissionResponse = googleDocsReadPathConnectorFixtures.find(
       (fixture) => fixture.name === "connector-google-docs-read-permission-denied"
     )?.value;
@@ -192,7 +192,7 @@ describe("M4 Google Docs read-path readiness", () => {
     expect(JSON.stringify([reconnect, permission])).not.toMatch(/Google connection must be refreshed|User is not authorized/i);
   });
 
-  it("keeps M4 safe log events metadata-only and detects unsafe fields or values", () => {
+  it("keeps Google Docs read-path safe log events metadata-only and detects unsafe fields or values", () => {
     const readyInput = createGoogleDocsReadinessDemoStates()[0];
     const event = createContextReadinessLogEvent(readyInput);
 
@@ -213,7 +213,7 @@ describe("M4 Google Docs read-path readiness", () => {
     ).toBe(false);
   });
 
-  it("renders local demo coverage for required M4 read-path state families", () => {
+  it("renders local demo coverage for required Google Docs read-path state families", () => {
     const viewModels = createGoogleDocsReadinessDemoStates().map(createGoogleDocsReadinessViewModel);
 
     expect(viewModels.map((viewModel) => viewModel.id)).toEqual([

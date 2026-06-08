@@ -2,26 +2,26 @@ import { CONTEXT_MODE_IDS, getContextModeOptions } from "./context-modes";
 import { FORBIDDEN_EXTENSION_RETENTION } from "./extension-surface";
 import { PROPOSED_ACTION_STATUSES, getProposedActionState, type ProposedActionStatus } from "./proposed-actions";
 
-export const M2_SESSION_ID = "session_m2_demo";
-export const M2_DOCUMENT_ID = "gdoc_m1_demo";
-export const M2_DOCUMENT_TITLE = "M1 fixture document";
-export const M2_RESOURCE_REVISION = "rev_m1";
-export const M2_DEFAULT_IDEMPOTENCY_PREFIX = "idem_m2_apply";
-export const M2_CONTRACT_VERSION = Object.freeze({
+export const ASSISTANT_DEMO_SESSION_ID = "session_assistant_demo";
+export const ASSISTANT_DEMO_DOCUMENT_ID = "gdoc_google_docs_demo";
+export const ASSISTANT_DEMO_DOCUMENT_TITLE = "Google Docs fixture document";
+export const ASSISTANT_DEMO_RESOURCE_REVISION = "rev_google_docs";
+export const APPLY_IDEMPOTENCY_PREFIX = "idem_apply";
+export const ASSISTANT_DEMO_CONTRACT_VERSION = Object.freeze({
   major: 0,
   minor: 1,
   patch: 0
 });
-export const M2_IDENTITY_SCOPE = Object.freeze({
-  tenantId: "tenant_m1_demo",
-  userId: "user_m1_demo",
-  authSubject: "auth_subject_m1_demo",
-  requestId: "req_m1_demo",
-  correlationId: "corr_m1_demo"
+export const ASSISTANT_DEMO_IDENTITY_SCOPE = Object.freeze({
+  tenantId: "tenant_google_docs_demo",
+  userId: "user_google_docs_demo",
+  authSubject: "auth_subject_google_docs_demo",
+  requestId: "req_google_docs_demo",
+  correlationId: "corr_google_docs_demo"
 });
 
-export type M2ActionType = "REPLACE_TEXT" | "INSERT_TEXT";
-export type M2ConflictKind = "STALE" | "AMBIGUOUS" | "OVERLAPPING" | "UNVERIFIABLE";
+export type ReviewActionType = "REPLACE_TEXT" | "INSERT_TEXT";
+export type ReviewConflictKind = "STALE" | "AMBIGUOUS" | "OVERLAPPING" | "UNVERIFIABLE";
 
 export type AssistantShellState = {
   panelAvailable: boolean;
@@ -51,7 +51,7 @@ export type ContractActionTargetAnchor = {
 
 export type ContractProposedActionReviewRef = {
   actionId: string;
-  actionType: M2ActionType;
+  actionType: ReviewActionType;
   status: ProposedActionStatus;
   resourceRef: {
     resourceId: string;
@@ -73,7 +73,7 @@ export type ContractProposedActionReviewRef = {
 
 export type ReviewCardViewModel = {
   actionId: string;
-  actionType: M2ActionType;
+  actionType: ReviewActionType;
   status: ProposedActionStatus;
   statusLabel: string;
   resourceId: string;
@@ -100,7 +100,7 @@ export type ReviewCardViewModel = {
 };
 
 export type ConflictDisplayModel = {
-  kind: M2ConflictKind;
+  kind: ReviewConflictKind;
   reasonCode: string;
   title: string;
   message: string;
@@ -108,10 +108,10 @@ export type ConflictDisplayModel = {
 };
 
 export type BackendCommandView = {
-  contractVersion: typeof M2_CONTRACT_VERSION;
+  contractVersion: typeof ASSISTANT_DEMO_CONTRACT_VERSION;
   commandId: string;
   commandType: "actions.approve" | "actions.reject" | "actions.apply";
-  identityScope: typeof M2_IDENTITY_SCOPE;
+  identityScope: typeof ASSISTANT_DEMO_IDENTITY_SCOPE;
   idempotencyKey?: string;
   payload: {
     sessionId: string;
@@ -155,23 +155,23 @@ export type SafeClientLogEvent = {
 const EMPTY_REVIEW_TEXT = "";
 const SAFE_LOG_TEXT = "[redacted]";
 
-export const DEMO_DOCUMENT_URL = `https://docs.google.com/document/d/${M2_DOCUMENT_ID}/edit`;
+export const DEMO_DOCUMENT_URL = `https://docs.google.com/document/d/${ASSISTANT_DEMO_DOCUMENT_ID}/edit`;
 const GOOGLE_DOCS_RESOURCE_REF = Object.freeze({
   connector: "google_docs",
-  resourceId: M2_DOCUMENT_ID,
+  resourceId: ASSISTANT_DEMO_DOCUMENT_ID,
   resourceType: "document",
-  displayName: M2_DOCUMENT_TITLE,
+  displayName: ASSISTANT_DEMO_DOCUMENT_TITLE,
   externalUrl: DEMO_DOCUMENT_URL
 });
 
 export const DEMO_REVIEW_FIXTURES: readonly ContractProposedActionReviewRef[] = Object.freeze([
   Object.freeze({
-    actionId: "action_m1_review",
+    actionId: "action_review_replace",
     actionType: "REPLACE_TEXT",
     status: PROPOSED_ACTION_STATUSES.PROPOSED,
     resourceRef: GOOGLE_DOCS_RESOURCE_REF,
     target: { targetRange: { start: 42, end: 64 } },
-    originalTextHash: "sha256:m1-original",
+    originalTextHash: "sha256:google-docs-original",
     currentText: "<fixture current text>",
     proposedText: "<fixture proposed text>",
     surroundingText: "<fixture surrounding context>",
@@ -179,24 +179,24 @@ export const DEMO_REVIEW_FIXTURES: readonly ContractProposedActionReviewRef[] = 
     expiresAt: "2026-06-03T18:00:00.000Z"
   }),
   Object.freeze({
-    actionId: "action_m1_insert",
+    actionId: "action_review_insert",
     actionType: "INSERT_TEXT",
     status: PROPOSED_ACTION_STATUSES.PROPOSED,
     resourceRef: GOOGLE_DOCS_RESOURCE_REF,
     target: { targetRange: { start: 80, end: 80 } },
-    originalTextHash: "sha256:m1-insert-anchor",
+    originalTextHash: "sha256:google-docs-insert-anchor",
     proposedText: "<fixture inserted text>",
     surroundingText: "<fixture second context>",
     rationale: "Add a transition.",
     expiresAt: "2026-06-03T18:00:00.000Z"
   }),
   Object.freeze({
-    actionId: "action_m1_approved",
+    actionId: "action_review_approved",
     actionType: "REPLACE_TEXT",
     status: PROPOSED_ACTION_STATUSES.APPROVED,
     resourceRef: GOOGLE_DOCS_RESOURCE_REF,
     target: { targetRange: { start: 100, end: 124 } },
-    originalTextHash: "sha256:m1-approved",
+    originalTextHash: "sha256:google-docs-approved",
     currentText: "<fixture approved current>",
     proposedText: "<fixture approved replacement>",
     surroundingText: "<fixture approved context>",
@@ -204,12 +204,12 @@ export const DEMO_REVIEW_FIXTURES: readonly ContractProposedActionReviewRef[] = 
     expiresAt: "2026-06-03T18:00:00.000Z"
   }),
   Object.freeze({
-    actionId: "action_m1_conflict_stale",
+    actionId: "action_conflict_stale",
     actionType: "REPLACE_TEXT",
     status: PROPOSED_ACTION_STATUSES.CONFLICTED,
     resourceRef: GOOGLE_DOCS_RESOURCE_REF,
     target: { targetRange: { start: 140, end: 164 } },
-    originalTextHash: "sha256:m1-stale",
+    originalTextHash: "sha256:google-docs-stale",
     currentText: "<fixture stale current>",
     proposedText: "<fixture stale replacement>",
     surroundingText: "<fixture stale context>",
@@ -218,12 +218,12 @@ export const DEMO_REVIEW_FIXTURES: readonly ContractProposedActionReviewRef[] = 
     expiresAt: "2026-06-03T18:00:00.000Z"
   }),
   Object.freeze({
-    actionId: "action_m2_conflict_ambiguous",
+    actionId: "action_review_conflict_ambiguous",
     actionType: "REPLACE_TEXT",
     status: PROPOSED_ACTION_STATUSES.CONFLICTED,
     resourceRef: GOOGLE_DOCS_RESOURCE_REF,
     target: { targetRange: { start: 170, end: 188 } },
-    originalTextHash: "sha256:m1-ambiguous",
+    originalTextHash: "sha256:google-docs-ambiguous",
     currentText: "<fixture ambiguous current>",
     proposedText: "<fixture ambiguous replacement>",
     surroundingText: "<fixture ambiguous context>",
@@ -232,12 +232,12 @@ export const DEMO_REVIEW_FIXTURES: readonly ContractProposedActionReviewRef[] = 
     expiresAt: "2026-06-03T18:00:00.000Z"
   }),
   Object.freeze({
-    actionId: "action_m2_conflict_unverifiable",
+    actionId: "action_review_conflict_unverifiable",
     actionType: "REPLACE_TEXT",
     status: PROPOSED_ACTION_STATUSES.CONFLICTED,
     resourceRef: GOOGLE_DOCS_RESOURCE_REF,
     target: { targetRange: { start: 200, end: 218 } },
-    originalTextHash: "sha256:m1-unverifiable",
+    originalTextHash: "sha256:google-docs-unverifiable",
     currentText: "<fixture unverifiable current>",
     proposedText: "<fixture unverifiable replacement>",
     surroundingText: "<fixture unverifiable context>",
@@ -250,12 +250,12 @@ export const DEMO_REVIEW_FIXTURES: readonly ContractProposedActionReviewRef[] = 
 export const OVERLAPPING_REVIEW_FIXTURES: readonly ContractProposedActionReviewRef[] = Object.freeze([
   DEMO_REVIEW_FIXTURES[0],
   Object.freeze({
-    actionId: "action_m1_overlap",
+    actionId: "action_review_overlap",
     actionType: "REPLACE_TEXT",
     status: PROPOSED_ACTION_STATUSES.PROPOSED,
     resourceRef: GOOGLE_DOCS_RESOURCE_REF,
     target: { targetRange: { start: 50, end: 70 } },
-    originalTextHash: "sha256:m1-overlap",
+    originalTextHash: "sha256:google-docs-overlap",
     currentText: "<fixture overlapping current>",
     proposedText: "<fixture overlapping replacement>",
     surroundingText: "<fixture overlap context>",
@@ -290,10 +290,10 @@ export function openAssistantShell(state: AssistantShellState): AssistantShellSt
 
 export function createContentScriptBridgeViewModel({
   supportState = "READY",
-  documentId = M2_DOCUMENT_ID,
-  title = M2_DOCUMENT_TITLE,
+  documentId = ASSISTANT_DEMO_DOCUMENT_ID,
+  title = ASSISTANT_DEMO_DOCUMENT_TITLE,
   url = DEMO_DOCUMENT_URL,
-  resourceRevision = M2_RESOURCE_REVISION
+  resourceRevision = ASSISTANT_DEMO_RESOURCE_REVISION
 }: Partial<ContentScriptBridgeViewModel> = {}): ContentScriptBridgeViewModel {
   return {
     supportState,
@@ -305,7 +305,7 @@ export function createContentScriptBridgeViewModel({
   };
 }
 
-export function getM2ContextModeOptions() {
+export function getAssistantDemoContextModeOptions() {
   return getContextModeOptions({
     activeResourceConnected: true,
     consentedModes: [CONTEXT_MODE_IDS.ACTIVE_RESOURCE]
@@ -319,7 +319,7 @@ export function getM2ContextModeOptions() {
   }));
 }
 
-export function mapM1ReviewFixtureToCard(
+export function mapReviewFixtureToCard(
   fixture: ContractProposedActionReviewRef,
   idempotencyKey = createApplyIdempotencyKey(fixture.actionId)
 ): ReviewCardViewModel {
@@ -366,10 +366,10 @@ export function mapM1ReviewFixtureToCard(
 }
 
 export function createReviewCardsFromFixtures(fixtures: readonly ContractProposedActionReviewRef[]): ReviewCardViewModel[] {
-  return markOverlappingCards(fixtures.map((fixture) => mapM1ReviewFixtureToCard(fixture)));
+  return markOverlappingCards(fixtures.map((fixture) => mapReviewFixtureToCard(fixture)));
 }
 
-export function approveReviewCard(card: ReviewCardViewModel, sessionId = M2_SESSION_ID): ReviewCardViewModel {
+export function approveReviewCard(card: ReviewCardViewModel, sessionId = ASSISTANT_DEMO_SESSION_ID): ReviewCardViewModel {
   if (card.status === PROPOSED_ACTION_STATUSES.APPROVED) {
     return withDuplicateNotice(card, "Approve already recorded.");
   }
@@ -390,7 +390,7 @@ export function approveReviewCard(card: ReviewCardViewModel, sessionId = M2_SESS
   };
 }
 
-export function rejectReviewCard(card: ReviewCardViewModel, sessionId = M2_SESSION_ID): ReviewCardViewModel {
+export function rejectReviewCard(card: ReviewCardViewModel, sessionId = ASSISTANT_DEMO_SESSION_ID): ReviewCardViewModel {
   if (card.status === PROPOSED_ACTION_STATUSES.REJECTED) {
     return withDuplicateNotice(card, "Reject already recorded.");
   }
@@ -412,7 +412,7 @@ export function rejectReviewCard(card: ReviewCardViewModel, sessionId = M2_SESSI
   };
 }
 
-export function applyReviewCard(card: ReviewCardViewModel, sessionId = M2_SESSION_ID): ReviewCardViewModel {
+export function applyReviewCard(card: ReviewCardViewModel, sessionId = ASSISTANT_DEMO_SESSION_ID): ReviewCardViewModel {
   if (card.pendingApplyCommand !== null) {
     return withDuplicateNotice(card, "Apply request already queued with the same idempotency key.");
   }
@@ -520,7 +520,7 @@ export function getApproveAllState(cards: readonly ReviewCardViewModel[]): Appro
   return { enabled: true, reason: null };
 }
 
-export function approveAllReviewCards(cards: readonly ReviewCardViewModel[], sessionId = M2_SESSION_ID): ReviewCardViewModel[] {
+export function approveAllReviewCards(cards: readonly ReviewCardViewModel[], sessionId = ASSISTANT_DEMO_SESSION_ID): ReviewCardViewModel[] {
   if (!getApproveAllState(cards).enabled) {
     return cards.map((card) => ({ ...card }));
   }
@@ -528,12 +528,12 @@ export function approveAllReviewCards(cards: readonly ReviewCardViewModel[], ses
   return cards.map((card) => (card.status === PROPOSED_ACTION_STATUSES.PROPOSED ? approveReviewCard(card, sessionId) : { ...card }));
 }
 
-export function createApplyActionCommand(actionId: string, idempotencyKey: string, sessionId = M2_SESSION_ID): BackendCommandView {
+export function createApplyActionCommand(actionId: string, idempotencyKey: string, sessionId = ASSISTANT_DEMO_SESSION_ID): BackendCommandView {
   return {
-    contractVersion: M2_CONTRACT_VERSION,
-    commandId: `cmd_m2_apply_${actionId}`,
+    contractVersion: ASSISTANT_DEMO_CONTRACT_VERSION,
+    commandId: `cmd_review_apply_${actionId}`,
     commandType: "actions.apply",
-    identityScope: M2_IDENTITY_SCOPE,
+    identityScope: ASSISTANT_DEMO_IDENTITY_SCOPE,
     idempotencyKey,
     payload: {
       sessionId,
@@ -543,7 +543,7 @@ export function createApplyActionCommand(actionId: string, idempotencyKey: strin
 }
 
 export function createApplyIdempotencyKey(actionId: string): string {
-  return `${M2_DEFAULT_IDEMPOTENCY_PREFIX}_${actionId}`;
+  return `${APPLY_IDEMPOTENCY_PREFIX}_${actionId}`;
 }
 
 export function createInitialMockChatState(): MockChatState {
@@ -615,10 +615,10 @@ function createDecisionCommand(
   reasonCode: string
 ): BackendCommandView {
   return {
-    contractVersion: M2_CONTRACT_VERSION,
-    commandId: `cmd_m2_${commandType.toLowerCase()}_${actionId}`,
+    contractVersion: ASSISTANT_DEMO_CONTRACT_VERSION,
+    commandId: `cmd_review_${commandType.toLowerCase()}_${actionId}`,
     commandType,
-    identityScope: M2_IDENTITY_SCOPE,
+    identityScope: ASSISTANT_DEMO_IDENTITY_SCOPE,
     payload: {
       sessionId,
       actionId,
@@ -638,7 +638,7 @@ function createConflictDisplayModel(
   reasonCode: string | undefined,
   originalTextHash: string | undefined,
   hasVerifiedTarget: boolean,
-  actionType: M2ActionType
+  actionType: ReviewActionType
 ): ConflictDisplayModel | null {
   const replaceHasHash = actionType === "REPLACE_TEXT" && originalTextHash !== undefined;
   const insertDoesNotNeedHash = actionType === "INSERT_TEXT";
@@ -659,7 +659,7 @@ function createConflictDisplayModel(
   };
 }
 
-function getConflictKind(reasonCode: string): M2ConflictKind {
+function getConflictKind(reasonCode: string): ReviewConflictKind {
   switch (reasonCode) {
     case "STALE_RESOURCE_REVISION":
     case "APPLY_TARGET_CONFLICTED":
@@ -673,7 +673,7 @@ function getConflictKind(reasonCode: string): M2ConflictKind {
   }
 }
 
-function getConflictTitle(kind: M2ConflictKind): string {
+function getConflictTitle(kind: ReviewConflictKind): string {
   switch (kind) {
     case "STALE":
       return "Stale target";
@@ -686,7 +686,7 @@ function getConflictTitle(kind: M2ConflictKind): string {
   }
 }
 
-function getConflictMessage(kind: M2ConflictKind): string {
+function getConflictMessage(kind: ReviewConflictKind): string {
   switch (kind) {
     case "STALE":
       return "The document changed before apply. No document mutation occurred.";

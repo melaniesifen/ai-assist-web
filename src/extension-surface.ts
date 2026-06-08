@@ -10,7 +10,7 @@ export type ExtensionSurfaceState =
 export const EXTENSION_CLIENT_RESPONSIBILITIES = Object.freeze([
   "Detect supported Google Docs pages before injecting UI.",
   "Host the primary assistant UI in a browser sidebar or side panel tied to the active document.",
-  "Keep any floating in-document affordance optional and later than the M2 primary side-panel surface.",
+  "Keep any floating in-document affordance optional and later than the primary side-panel surface.",
   "Detect and send the current Google Docs document ID as resource metadata.",
   "Keep raw prompts, document text, model responses, and action payloads only in active user-visible state."
 ] as const);

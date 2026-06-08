@@ -25,10 +25,10 @@ export const RESOURCE_SESSION_READINESS_STATUSES = Object.freeze({
   NOT_READY: "not_ready"
 });
 
-export const M3_DEFAULT_CONTEXT_MODE = "SELECTION";
-export const M3_SETUP_UPDATED_AT = "2026-06-06T18:00:00.000Z";
-export const M3_DEMO_SESSION_EXPIRES_AT = "2026-06-06T20:00:00.000Z";
-export const M3_DEMO_SECRET_EXPIRES_AT = "2026-06-07T02:00:00.000Z";
+export const DEFAULT_SETUP_CONTEXT_MODE = "SELECTION";
+export const SETUP_DEMO_UPDATED_AT = "2026-06-06T18:00:00.000Z";
+export const SETUP_DEMO_SESSION_EXPIRES_AT = "2026-06-06T20:00:00.000Z";
+export const SETUP_DEMO_SECRET_EXPIRES_AT = "2026-06-07T02:00:00.000Z";
 
 const PROVIDER_LABELS: Readonly<Record<string, string>> = Object.freeze({
   OPENAI: "OpenAI",
@@ -179,7 +179,7 @@ export type SetupErrorViewModel = {
 export type FirstRunSetupViewModel = {
   ready: boolean;
   updatedAt: string;
-  contextPosture: typeof M3_DEFAULT_CONTEXT_MODE;
+  contextPosture: typeof DEFAULT_SETUP_CONTEXT_MODE;
   productSession: SetupCardViewModel;
   googleOAuth: SetupCardViewModel;
   providerSecrets: readonly SetupCardViewModel[];
@@ -226,28 +226,28 @@ export function createSetupDemoStates(): readonly FirstRunSetupStatus[] {
     {
       productSession: {
         status: PRODUCT_SESSION_STATUSES.AUTHENTICATED,
-        tenantId: "tenant_m3_demo",
-        userId: "user_m3_demo",
-        authSubject: "auth_subject_m3_demo",
-        sessionId: "session_m3_demo",
-        expiresAt: M3_DEMO_SESSION_EXPIRES_AT
+        tenantId: "tenant_setup_demo",
+        userId: "user_setup_demo",
+        authSubject: "auth_subject_setup_demo",
+        sessionId: "session_setup_demo",
+        expiresAt: SETUP_DEMO_SESSION_EXPIRES_AT
       },
       googleOAuth: {
         provider: "google",
         status: GOOGLE_OAUTH_CONNECTION_STATUSES.CONNECTED,
-        googleAccountId: "google_account_m3_demo",
+        googleAccountId: "google_account_setup_demo",
         scopes: Object.freeze(["https://www.googleapis.com/auth/documents"]),
-        connectedAt: M3_SETUP_UPDATED_AT,
-        expiresAt: M3_DEMO_SESSION_EXPIRES_AT
+        connectedAt: SETUP_DEMO_UPDATED_AT,
+        expiresAt: SETUP_DEMO_SESSION_EXPIRES_AT
       },
       providerSecrets: Object.freeze([
         {
           provider: "OPENAI",
           status: PROVIDER_SECRET_READINESS_STATUSES.VALID,
-          secretId: "secret_m3_openai",
-          fingerprint: "fp_m3_openai",
-          lastValidatedAt: M3_SETUP_UPDATED_AT,
-          expiresAt: M3_DEMO_SECRET_EXPIRES_AT
+          secretId: "secret_setup_openai",
+          fingerprint: "fp_setup_openai",
+          lastValidatedAt: SETUP_DEMO_UPDATED_AT,
+          expiresAt: SETUP_DEMO_SECRET_EXPIRES_AT
         },
         {
           provider: "ANTHROPIC",
@@ -256,18 +256,18 @@ export function createSetupDemoStates(): readonly FirstRunSetupStatus[] {
       ]),
       resourceSession: {
         status: RESOURCE_SESSION_READINESS_STATUSES.READY,
-        sessionId: "resource_session_m3_demo",
+        sessionId: "resource_session_setup_demo",
         resourceRef: {
           connector: "google_docs",
-          resourceId: "gdoc_m3_demo",
+          resourceId: "gdoc_setup_demo",
           resourceType: "document",
-          displayName: "M3 setup fixture document"
+          displayName: "Setup fixture document"
         },
-        resourceRevision: "rev_m3_demo",
-        createdAt: M3_SETUP_UPDATED_AT
+        resourceRevision: "rev_setup_demo",
+        createdAt: SETUP_DEMO_UPDATED_AT
       },
       errors: Object.freeze([]),
-      updatedAt: M3_SETUP_UPDATED_AT
+      updatedAt: SETUP_DEMO_UPDATED_AT
     },
     {
       productSession: {
@@ -277,7 +277,7 @@ export function createSetupDemoStates(): readonly FirstRunSetupStatus[] {
       googleOAuth: {
         provider: "google",
         status: GOOGLE_OAUTH_CONNECTION_STATUSES.RECONNECT_REQUIRED,
-        googleAccountId: "google_account_m3_demo",
+        googleAccountId: "google_account_setup_demo",
         error: {
           code: "OAUTH_RECONNECT_REQUIRED",
           category: "oauth",
@@ -288,14 +288,14 @@ export function createSetupDemoStates(): readonly FirstRunSetupStatus[] {
         {
           provider: "OPENAI",
           status: PROVIDER_SECRET_READINESS_STATUSES.EXPIRED,
-          fingerprint: "fp_m3_openai",
+          fingerprint: "fp_setup_openai",
           expiresAt: "2026-06-06T17:30:00.000Z",
           error: { code: "PROVIDER_SECRET_EXPIRED", category: "authentication" }
         },
         {
           provider: "ANTHROPIC",
           status: PROVIDER_SECRET_READINESS_STATUSES.INVALID,
-          lastValidatedAt: M3_SETUP_UPDATED_AT,
+          lastValidatedAt: SETUP_DEMO_UPDATED_AT,
           error: { code: "PROVIDER_SECRET_INVALID", category: "authentication" }
         }
       ]),
@@ -308,7 +308,7 @@ export function createSetupDemoStates(): readonly FirstRunSetupStatus[] {
         { kind: "provider_secret_expired", error: { code: "PROVIDER_SECRET_EXPIRED" } },
         { kind: "resource_session_not_ready", error: { code: "RESOURCE_SESSION_NOT_READY" } }
       ]),
-      updatedAt: M3_SETUP_UPDATED_AT
+      updatedAt: SETUP_DEMO_UPDATED_AT
     }
   ]);
 }
@@ -352,10 +352,10 @@ function createCoverageStatus({
       status: sessionStatus,
       ...(sessionStatus === PRODUCT_SESSION_STATUSES.AUTHENTICATED
         ? {
-            tenantId: "tenant_m3_demo",
-            userId: "user_m3_demo",
-            authSubject: "auth_subject_m3_demo",
-            sessionId: "session_m3_demo"
+            tenantId: "tenant_setup_demo",
+            userId: "user_setup_demo",
+            authSubject: "auth_subject_setup_demo",
+            sessionId: "session_setup_demo"
           }
         : {})
     },
@@ -363,7 +363,7 @@ function createCoverageStatus({
       provider: "google",
       status: googleStatus,
       ...(googleStatus === GOOGLE_OAUTH_CONNECTION_STATUSES.CONNECTED
-        ? { googleAccountId: "google_account_m3_demo", scopes: Object.freeze(["https://www.googleapis.com/auth/documents"]) }
+        ? { googleAccountId: "google_account_setup_demo", scopes: Object.freeze(["https://www.googleapis.com/auth/documents"]) }
         : {})
     },
     providerSecrets: Object.freeze([
@@ -371,7 +371,7 @@ function createCoverageStatus({
         provider: "OPENAI",
         status: providerStatus,
         ...(providerStatus === PROVIDER_SECRET_READINESS_STATUSES.VALID
-          ? { secretId: "secret_m3_openai", fingerprint: "fp_m3_openai", expiresAt: M3_DEMO_SECRET_EXPIRES_AT }
+          ? { secretId: "secret_setup_openai", fingerprint: "fp_setup_openai", expiresAt: SETUP_DEMO_SECRET_EXPIRES_AT }
           : {})
       }
     ]),
@@ -379,19 +379,19 @@ function createCoverageStatus({
       status: resourceStatus,
       ...(resourceStatus === RESOURCE_SESSION_READINESS_STATUSES.READY
         ? {
-            sessionId: "resource_session_m3_demo",
+            sessionId: "resource_session_setup_demo",
             resourceRef: {
               connector: "google_docs",
-              resourceId: "gdoc_m3_demo",
+              resourceId: "gdoc_setup_demo",
               resourceType: "document",
-              displayName: "M3 setup fixture document"
+              displayName: "Setup fixture document"
             },
-            resourceRevision: "rev_m3_demo"
+            resourceRevision: "rev_setup_demo"
           }
         : {})
     },
     errors: Object.freeze([]),
-    updatedAt: M3_SETUP_UPDATED_AT
+    updatedAt: SETUP_DEMO_UPDATED_AT
   };
 }
 
@@ -411,7 +411,7 @@ export function createFirstRunSetupViewModel(status: FirstRunSetupStatus): First
   return {
     ready,
     updatedAt: status.updatedAt,
-    contextPosture: M3_DEFAULT_CONTEXT_MODE,
+    contextPosture: DEFAULT_SETUP_CONTEXT_MODE,
     productSession,
     googleOAuth,
     providerSecrets,
