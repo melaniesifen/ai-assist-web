@@ -100,6 +100,17 @@ Relevant design sources: frontend, provider-key, command, SSE, context, proposed
 - [x] M7-T5: Verify browser/client logs exclude OAuth tokens, provider keys, authorization headers, document text, selected text, prompts, model response bodies, action payload plaintext, screenshots, OCR, and accessibility trees.
 - [x] M7-T5: Run web unit tests, production build, and Firefox e2e checks for the browser-facing UI.
 
+## M8 Real-Flow UX Hardening Progress
+
+- [x] M8-T5: Render product-session and expired-session states from backend-shaped setup data.
+- [x] M8-T5: Render Google connect, status, reconnect, and disconnect route/state coverage without exposing OAuth tokens.
+- [x] M8-T5: Show platform provider availability as the default trusted-user path, with BYO provider-key cards retained only as optional fallback state.
+- [x] M8-T5: Render document readiness, selected/active resource context, ask/stream, proposed-action review, approve/reject, apply, conflict, failed, denied, and reconnect-required states.
+- [x] M8-T5: Add configurable HTTP/SSE client route helpers while keeping deterministic fake-backed tests.
+- [x] M8-T5: Cover loading, retry, empty, disabled, quota/rate-limit, provider-unavailable, stale-document, and uncertain-mutation style safe error states.
+- [x] M8-T5: Verify browser/client log helpers exclude forbidden sensitive content.
+- [x] M8-T5: Add responsive layout coverage for the real-flow state grid.
+
 ## E2E-Owned UI Validation
 
 - [ ] E2E-001: Validate first-run onboarding UI for login, Google connection, provider-key entry, provider validation result, and Google resource-session start.

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   GOOGLE_OAUTH_CONNECTION_STATUSES,
+  PLATFORM_PROVIDER_AVAILABILITY_STATUSES,
   PRODUCT_SESSION_STATUSES,
   PROVIDER_SECRET_READINESS_STATUSES,
   RESOURCE_SESSION_READINESS_STATUSES,
@@ -14,6 +15,7 @@ import {
 } from "../src/setup-state";
 
 async function loadFirstRunSetupContractFixtures(): Promise<{
+  trustedUserSetupReadyFixture: { value: FirstRunSetupStatus };
   firstRunSetupReadyFixture: { value: FirstRunSetupStatus };
   firstRunSetupNeedsUserActionFixture: { value: FirstRunSetupStatus };
   validateFirstRunSetupStatus: (value: unknown) => { valid: boolean; issues: readonly unknown[] };
@@ -24,6 +26,7 @@ async function loadFirstRunSetupContractFixtures(): Promise<{
   const setup = await import("../../ai-assist-contracts/src/setup.js");
 
   return {
+    trustedUserSetupReadyFixture: fixtures.trustedUserSetupReadyFixture,
     firstRunSetupReadyFixture: fixtures.firstRunSetupReadyFixture,
     firstRunSetupNeedsUserActionFixture: fixtures.firstRunSetupNeedsUserActionFixture,
     validateFirstRunSetupStatus: setup.validateFirstRunSetupStatus
@@ -33,20 +36,26 @@ async function loadFirstRunSetupContractFixtures(): Promise<{
 describe("First-run setup state", () => {
   it("maps real M3 contract fixtures into setup view models", async () => {
     const {
+      trustedUserSetupReadyFixture,
       firstRunSetupReadyFixture,
       firstRunSetupNeedsUserActionFixture,
       validateFirstRunSetupStatus
     } = await loadFirstRunSetupContractFixtures();
 
+    expect(validateFirstRunSetupStatus(trustedUserSetupReadyFixture.value)).toMatchObject({ valid: true, issues: [] });
     expect(validateFirstRunSetupStatus(firstRunSetupReadyFixture.value)).toMatchObject({ valid: true, issues: [] });
     expect(validateFirstRunSetupStatus(firstRunSetupNeedsUserActionFixture.value)).toMatchObject({
       valid: true,
       issues: []
     });
 
+    const trustedUserReady = createFirstRunSetupViewModel(trustedUserSetupReadyFixture.value);
     const ready = createFirstRunSetupViewModel(firstRunSetupReadyFixture.value);
     const needsAction = createFirstRunSetupViewModel(firstRunSetupNeedsUserActionFixture.value);
 
+    expect(trustedUserReady.ready).toBe(true);
+    expect(trustedUserReady.platformProviders[0].status).toBe("Available");
+    expect(trustedUserReady.providerSecrets).toHaveLength(0);
     expect(ready.ready).toBe(true);
     expect(ready.contextPosture).toBe("SELECTION");
     expect(ready.productSession.status).toBe("Authenticated");
@@ -56,7 +65,7 @@ describe("First-run setup state", () => {
     expect(needsAction.ready).toBe(false);
     expect(needsAction.errors.map((error) => error.kind)).toEqual([
       "product_session_expired",
-      "provider_secret_expired"
+      "platform_provider_quota_limited"
     ]);
   });
 
@@ -91,7 +100,7 @@ describe("First-run setup state", () => {
       RESOURCE_SESSION_READINESS_STATUSES.READY,
       RESOURCE_SESSION_READINESS_STATUSES.NOT_READY
     ]);
-    expect(labels).toContain("OpenAI key: Pending validation");
+    expect(labels).toContain("OpenAI platform access: Available");
     expect(labels).toContain("OpenAI key: Validation failed");
     expect(createFirstRunSetupViewModel(validCoverageStatus).providerSecrets[0].status).toBe("Valid");
   });
@@ -99,8 +108,10 @@ describe("First-run setup state", () => {
   it("renders local setup demo states for ready and needs-action setup", () => {
     const viewModels = createSetupDemoStates().map(createFirstRunSetupViewModel);
 
-    expect(viewModels).toHaveLength(2);
+    expect(viewModels).toHaveLength(3);
     expect(viewModels[0].ready).toBe(true);
+    expect(viewModels[0].platformProviders.map((provider) => provider.status)).toEqual(["Available"]);
+    expect(viewModels[0].providerSecrets).toHaveLength(0);
     expect(viewModels[0].productSession.metadata.map((item) => item.label)).toEqual([
       "Tenant",
       "User",
@@ -113,11 +124,62 @@ describe("First-run setup state", () => {
       "Resource",
       "Revision"
     ]);
-    expect(viewModels[1].ready).toBe(false);
-    expect(viewModels[1].productSession.status).toBe("Expired");
-    expect(viewModels[1].googleOAuth.status).toBe("Reconnect required");
-    expect(viewModels[1].providerSecrets.map((provider) => provider.status)).toEqual(["Expired", "Invalid"]);
-    expect(viewModels[1].resourceSession.status).toBe("Not ready");
+    expect(viewModels[1].ready).toBe(true);
+    expect(viewModels[1].platformProviders).toHaveLength(0);
+    expect(viewModels[1].providerSecrets.map((provider) => provider.status)).toEqual(["Valid", "Missing"]);
+    expect(viewModels[2].ready).toBe(false);
+    expect(viewModels[2].productSession.status).toBe("Expired");
+    expect(viewModels[2].googleOAuth.status).toBe("Reconnect required");
+    expect(viewModels[2].platformProviders.map((provider) => provider.status)).toEqual(["Quota limited", "Misconfigured"]);
+    expect(viewModels[2].providerSecrets.map((provider) => provider.status)).toEqual(["Expired", "Invalid"]);
+    expect(viewModels[2].resourceSession.status).toBe("Not ready");
+  });
+
+  it("uses platform provider availability as the default ready path", () => {
+    const status: FirstRunSetupStatus = {
+      productSession: {
+        status: PRODUCT_SESSION_STATUSES.AUTHENTICATED,
+        tenantId: "tenant_setup_demo",
+        userId: "user_setup_demo",
+        authSubject: "auth_subject_setup_demo",
+        sessionId: "session_setup_demo"
+      },
+      googleOAuth: {
+        provider: "google",
+        status: GOOGLE_OAUTH_CONNECTION_STATUSES.CONNECTED,
+        googleAccountId: "google_account_setup_demo",
+        scopes: ["https://www.googleapis.com/auth/documents"]
+      },
+      platformProviders: [
+        {
+          provider: "OPENAI",
+          status: PLATFORM_PROVIDER_AVAILABILITY_STATUSES.AVAILABLE,
+          lastCheckedAt: "2026-06-06T18:00:00.000Z"
+        }
+      ],
+      providerSecrets: [],
+      resourceSession: {
+        status: RESOURCE_SESSION_READINESS_STATUSES.READY,
+        sessionId: "resource_session_setup_demo",
+        resourceRef: {
+          connector: "google_docs",
+          resourceId: "gdoc_setup_demo",
+          resourceType: "document",
+          displayName: "Setup fixture document"
+        },
+        resourceRevision: "rev_setup_demo"
+      },
+      errors: [],
+      updatedAt: "2026-06-06T18:00:00.000Z"
+    };
+
+    const viewModel = createFirstRunSetupViewModel(status);
+
+    expect(viewModel.ready).toBe(true);
+    expect(viewModel.platformProviders[0].message).toContain("default trusted-user flow");
+    expect(viewModel.safeLogEvent.platformProviderStatuses).toEqual([
+      { provider: "OPENAI", status: PLATFORM_PROVIDER_AVAILABILITY_STATUSES.AVAILABLE }
+    ]);
   });
 
   it("maps every provider key readiness state safely", () => {
@@ -135,6 +197,16 @@ describe("First-run setup state", () => {
         googleAccountId: "google_account_setup_demo",
         scopes: ["https://www.googleapis.com/auth/documents"]
       },
+      platformProviders: [
+        {
+          provider: "OPENAI",
+          status: PLATFORM_PROVIDER_AVAILABILITY_STATUSES.UNAVAILABLE,
+          error: {
+            code: "PROVIDER_UNAVAILABLE",
+            message: "model response leaked through backend error"
+          }
+        }
+      ],
       providerSecrets: [
         { provider: "OPENAI", status: PROVIDER_SECRET_READINESS_STATUSES.MISSING },
         { provider: "OPENAI", status: PROVIDER_SECRET_READINESS_STATUSES.PENDING_VALIDATION },
@@ -230,6 +302,7 @@ describe("First-run setup state", () => {
       updatedAt: "2026-06-06T18:00:00.000Z",
       productSessionStatus: PRODUCT_SESSION_STATUSES.ANONYMOUS,
       googleOAuthStatus: GOOGLE_OAUTH_CONNECTION_STATUSES.NOT_CONNECTED,
+      platformProviderStatuses: [],
       providerSecretStatuses: [{ provider: "OPENAI", status: PROVIDER_SECRET_READINESS_STATUSES.MISSING }],
       resourceSessionStatus: "unknown",
       errorKinds: ["provider_secret_required"]
@@ -241,6 +314,7 @@ describe("First-run setup state", () => {
       updatedAt: "2026-06-06T18:00:00.000Z",
       productSessionStatus: PRODUCT_SESSION_STATUSES.ANONYMOUS,
       googleOAuthStatus: GOOGLE_OAUTH_CONNECTION_STATUSES.NOT_CONNECTED,
+      platformProviderStatuses: [],
       providerSecretStatuses: [{ provider: "OPENAI", status: PROVIDER_SECRET_READINESS_STATUSES.MISSING }],
       resourceSessionStatus: "unknown",
       errorKinds: ["provider_secret_required"],
@@ -253,6 +327,7 @@ describe("First-run setup state", () => {
       updatedAt: "2026-06-06T18:00:00.000Z",
       productSessionStatus: PRODUCT_SESSION_STATUSES.ANONYMOUS,
       googleOAuthStatus: GOOGLE_OAUTH_CONNECTION_STATUSES.NOT_CONNECTED,
+      platformProviderStatuses: [],
       providerSecretStatuses: [{ provider: "OPENAI", status: PROVIDER_SECRET_READINESS_STATUSES.MISSING }],
       resourceSessionStatus: "unknown",
       errorKinds: ["prompt: raw document"]

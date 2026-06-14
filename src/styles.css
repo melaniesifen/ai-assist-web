@@ -138,6 +138,7 @@ code {
 
 .setup-harness,
 .context-readiness-harness,
+.real-flow-harness,
 .session-stream-harness {
   display: grid;
   gap: 14px;
@@ -190,9 +191,23 @@ code {
   gap: 14px;
 }
 
+.real-flow-grid {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.8fr) minmax(0, 1.2fr);
+  gap: 14px;
+}
+
+.real-flow-steps {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
 .setup-scenario,
 .setup-coverage,
 .readiness-card,
+.real-flow-summary,
+.real-flow-step,
 .stream-card {
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -282,6 +297,52 @@ code {
   font-size: 0.74rem;
   font-weight: 800;
   text-transform: uppercase;
+}
+
+.real-flow-step {
+  display: grid;
+  gap: 8px;
+  border-radius: 6px;
+}
+
+.real-flow-step.ready {
+  border-color: #9bd1ab;
+}
+
+.real-flow-step.blocked {
+  border-color: #e5b5ad;
+}
+
+.real-flow-step.pending {
+  border-color: #e6c76d;
+}
+
+.real-flow-step header {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.real-flow-step header span {
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.real-flow-step p {
+  margin-bottom: 0;
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.real-flow-step dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  margin: 0;
+  font-size: 0.78rem;
 }
 
 .setup-card dl,
@@ -801,6 +862,9 @@ dd {
   .readiness-grid,
   .readiness-summary,
   .readiness-metadata,
+  .real-flow-grid,
+  .real-flow-steps,
+  .real-flow-step dl,
   .stream-grid,
   .stream-metadata {
     grid-template-columns: 1fr;

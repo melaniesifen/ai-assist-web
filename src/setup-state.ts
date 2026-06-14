@@ -19,6 +19,13 @@ export const PROVIDER_SECRET_READINESS_STATUSES = Object.freeze({
   VALIDATION_FAILED: "validation_failed"
 });
 
+export const PLATFORM_PROVIDER_AVAILABILITY_STATUSES = Object.freeze({
+  AVAILABLE: "available",
+  UNAVAILABLE: "unavailable",
+  MISCONFIGURED: "misconfigured",
+  QUOTA_LIMITED: "quota_limited"
+});
+
 export const RESOURCE_SESSION_READINESS_STATUSES = Object.freeze({
   NOT_STARTED: "not_started",
   READY: "ready",
@@ -42,6 +49,9 @@ const SAFE_ERROR_MESSAGES: Readonly<Record<string, string>> = Object.freeze({
   product_session_required: "Sign in before continuing setup.",
   product_session_expired: "Your product session expired. Sign in again.",
   google_oauth_reconnect_required: "Reconnect Google to continue.",
+  platform_provider_unavailable: "Platform provider access is temporarily unavailable.",
+  platform_provider_misconfigured: "Platform provider access needs configuration.",
+  platform_provider_quota_limited: "Platform provider quota is temporarily limited. Retry later.",
   provider_secret_required: "Add a provider key before starting the resource session.",
   provider_secret_invalid: "Provider key validation failed. Enter a new key.",
   provider_secret_expired: "Provider credentials expired. Enter a new provider key.",
@@ -82,6 +92,8 @@ export type GoogleOAuthConnectionStatus =
   (typeof GOOGLE_OAUTH_CONNECTION_STATUSES)[keyof typeof GOOGLE_OAUTH_CONNECTION_STATUSES];
 export type ProviderSecretReadinessStatus =
   (typeof PROVIDER_SECRET_READINESS_STATUSES)[keyof typeof PROVIDER_SECRET_READINESS_STATUSES];
+export type PlatformProviderAvailabilityStatus =
+  (typeof PLATFORM_PROVIDER_AVAILABILITY_STATUSES)[keyof typeof PLATFORM_PROVIDER_AVAILABILITY_STATUSES];
 export type ResourceSessionReadinessStatus =
   (typeof RESOURCE_SESSION_READINESS_STATUSES)[keyof typeof RESOURCE_SESSION_READINESS_STATUSES];
 
@@ -124,6 +136,14 @@ export type ProviderSecretReadinessRef = {
   error?: ContractErrorRef;
 };
 
+export type PlatformProviderAvailabilityRef = {
+  provider: string;
+  status: PlatformProviderAvailabilityStatus;
+  configuredAt?: string;
+  lastCheckedAt?: string;
+  error?: ContractErrorRef;
+};
+
 export type ResourceRef = {
   connector: string;
   resourceId: string;
@@ -148,6 +168,7 @@ export type SetupErrorRef = {
 export type FirstRunSetupStatus = {
   productSession: ProductSessionStatusRef;
   googleOAuth: GoogleOAuthConnectionStatusRef;
+  platformProviders?: readonly PlatformProviderAvailabilityRef[];
   providerSecrets: readonly ProviderSecretReadinessRef[];
   resourceSession?: ResourceSessionReadinessRef;
   errors: readonly SetupErrorRef[];
@@ -182,6 +203,7 @@ export type FirstRunSetupViewModel = {
   contextPosture: typeof DEFAULT_SETUP_CONTEXT_MODE;
   productSession: SetupCardViewModel;
   googleOAuth: SetupCardViewModel;
+  platformProviders: readonly SetupCardViewModel[];
   providerSecrets: readonly SetupCardViewModel[];
   resourceSession: SetupCardViewModel;
   errors: readonly SetupErrorViewModel[];
@@ -194,6 +216,10 @@ export type SafeSetupLogEvent = {
   updatedAt: string;
   productSessionStatus: ProductSessionStatus;
   googleOAuthStatus: GoogleOAuthConnectionStatus;
+  platformProviderStatuses: readonly {
+    provider: string;
+    status: PlatformProviderAvailabilityStatus;
+  }[];
   providerSecretStatuses: readonly {
     provider: string;
     status: ProviderSecretReadinessStatus;
@@ -240,6 +266,48 @@ export function createSetupDemoStates(): readonly FirstRunSetupStatus[] {
         connectedAt: SETUP_DEMO_UPDATED_AT,
         expiresAt: SETUP_DEMO_SESSION_EXPIRES_AT
       },
+      platformProviders: Object.freeze([
+        {
+          provider: "OPENAI",
+          status: PLATFORM_PROVIDER_AVAILABILITY_STATUSES.AVAILABLE,
+          configuredAt: "2026-06-06T17:00:00.000Z",
+          lastCheckedAt: SETUP_DEMO_UPDATED_AT
+        }
+      ]),
+      providerSecrets: Object.freeze([]),
+      resourceSession: {
+        status: RESOURCE_SESSION_READINESS_STATUSES.READY,
+        sessionId: "resource_session_setup_demo",
+        resourceRef: {
+          connector: "google_docs",
+          resourceId: "gdoc_setup_demo",
+          resourceType: "document",
+          displayName: "Setup fixture document"
+        },
+        resourceRevision: "rev_setup_demo",
+        createdAt: SETUP_DEMO_UPDATED_AT
+      },
+      errors: Object.freeze([]),
+      updatedAt: SETUP_DEMO_UPDATED_AT
+    },
+    {
+      productSession: {
+        status: PRODUCT_SESSION_STATUSES.AUTHENTICATED,
+        tenantId: "tenant_setup_demo",
+        userId: "user_setup_demo",
+        authSubject: "auth_subject_setup_demo",
+        sessionId: "session_setup_demo",
+        expiresAt: SETUP_DEMO_SESSION_EXPIRES_AT
+      },
+      googleOAuth: {
+        provider: "google",
+        status: GOOGLE_OAUTH_CONNECTION_STATUSES.CONNECTED,
+        googleAccountId: "google_account_setup_demo",
+        scopes: Object.freeze(["https://www.googleapis.com/auth/documents"]),
+        connectedAt: SETUP_DEMO_UPDATED_AT,
+        expiresAt: SETUP_DEMO_SESSION_EXPIRES_AT
+      },
+      platformProviders: Object.freeze([]),
       providerSecrets: Object.freeze([
         {
           provider: "OPENAI",
@@ -284,6 +352,20 @@ export function createSetupDemoStates(): readonly FirstRunSetupStatus[] {
           message: "Google connection must be refreshed."
         }
       },
+      platformProviders: Object.freeze([
+        {
+          provider: "OPENAI",
+          status: PLATFORM_PROVIDER_AVAILABILITY_STATUSES.QUOTA_LIMITED,
+          lastCheckedAt: SETUP_DEMO_UPDATED_AT,
+          error: { code: "PROVIDER_QUOTA_EXCEEDED", category: "provider_quota", retryable: true }
+        },
+        {
+          provider: "ANTHROPIC",
+          status: PLATFORM_PROVIDER_AVAILABILITY_STATUSES.MISCONFIGURED,
+          lastCheckedAt: SETUP_DEMO_UPDATED_AT,
+          error: { code: "PROVIDER_CONFIG_MISSING", category: "dependency", retryable: false }
+        }
+      ]),
       providerSecrets: Object.freeze([
         {
           provider: "OPENAI",
@@ -305,7 +387,7 @@ export function createSetupDemoStates(): readonly FirstRunSetupStatus[] {
       },
       errors: Object.freeze([
         { kind: "product_session_expired", error: { code: "AUTHENTICATION_EXPIRED" } },
-        { kind: "provider_secret_expired", error: { code: "PROVIDER_SECRET_EXPIRED" } },
+        { kind: "platform_provider_quota_limited", error: { code: "PROVIDER_QUOTA_EXCEEDED" } },
         { kind: "resource_session_not_ready", error: { code: "RESOURCE_SESSION_NOT_READY" } }
       ]),
       updatedAt: SETUP_DEMO_UPDATED_AT
@@ -366,6 +448,16 @@ function createCoverageStatus({
         ? { googleAccountId: "google_account_setup_demo", scopes: Object.freeze(["https://www.googleapis.com/auth/documents"]) }
         : {})
     },
+    platformProviders: Object.freeze([
+      {
+        provider: "OPENAI",
+        status:
+          providerStatus === PROVIDER_SECRET_READINESS_STATUSES.PENDING_VALIDATION
+            ? PLATFORM_PROVIDER_AVAILABILITY_STATUSES.AVAILABLE
+            : PLATFORM_PROVIDER_AVAILABILITY_STATUSES.UNAVAILABLE,
+        lastCheckedAt: SETUP_DEMO_UPDATED_AT
+      }
+    ]),
     providerSecrets: Object.freeze([
       {
         provider: "OPENAI",
@@ -398,13 +490,17 @@ function createCoverageStatus({
 export function createFirstRunSetupViewModel(status: FirstRunSetupStatus): FirstRunSetupViewModel {
   const productSession = mapProductSession(status.productSession);
   const googleOAuth = mapGoogleOAuth(status.googleOAuth);
+  const platformProviders = (status.platformProviders ?? []).map(mapPlatformProvider);
   const providerSecrets = status.providerSecrets.map(mapProviderSecret);
   const resourceSession = mapResourceSession(status.resourceSession);
   const errors = status.errors.map(mapSetupError);
+  const providerReady =
+    platformProviders.some((provider) => provider.tone === "ready") ||
+    providerSecrets.some((provider) => provider.tone === "ready");
   const ready =
     productSession.tone === "ready" &&
     googleOAuth.tone === "ready" &&
-    providerSecrets.some((provider) => provider.tone === "ready") &&
+    providerReady &&
     resourceSession.tone === "ready" &&
     errors.length === 0;
 
@@ -414,11 +510,60 @@ export function createFirstRunSetupViewModel(status: FirstRunSetupStatus): First
     contextPosture: DEFAULT_SETUP_CONTEXT_MODE,
     productSession,
     googleOAuth,
+    platformProviders,
     providerSecrets,
     resourceSession,
     errors,
     safeLogEvent: createSafeSetupLogEvent(status, ready)
   };
+}
+
+function mapPlatformProvider(provider: PlatformProviderAvailabilityRef): SetupCardViewModel {
+  const label = `${labelProvider(provider.provider)} platform access`;
+  const commonMetadata = compactMetadata([
+    metadata("Provider", provider.provider),
+    metadata("Configured", provider.configuredAt),
+    metadata("Last checked", provider.lastCheckedAt)
+  ]);
+
+  switch (provider.status) {
+    case PLATFORM_PROVIDER_AVAILABILITY_STATUSES.AVAILABLE:
+      return {
+        id: `platform-provider-${provider.provider.toLowerCase()}`,
+        label,
+        status: "Available",
+        tone: "ready",
+        message: "Platform provider access is available for the default trusted-user flow.",
+        metadata: commonMetadata
+      };
+    case PLATFORM_PROVIDER_AVAILABILITY_STATUSES.QUOTA_LIMITED:
+      return {
+        id: `platform-provider-${provider.provider.toLowerCase()}`,
+        label,
+        status: "Quota limited",
+        tone: "blocked",
+        message: "Platform provider quota is temporarily limited. Retry later.",
+        metadata: commonMetadata
+      };
+    case PLATFORM_PROVIDER_AVAILABILITY_STATUSES.MISCONFIGURED:
+      return {
+        id: `platform-provider-${provider.provider.toLowerCase()}`,
+        label,
+        status: "Misconfigured",
+        tone: "blocked",
+        message: "Platform provider access needs backend configuration.",
+        metadata: commonMetadata
+      };
+    default:
+      return {
+        id: `platform-provider-${provider.provider.toLowerCase()}`,
+        label,
+        status: "Unavailable",
+        tone: "blocked",
+        message: "Platform provider access is temporarily unavailable.",
+        metadata: commonMetadata
+      };
+  }
 }
 
 function mapProductSession(session: ProductSessionStatusRef): SetupCardViewModel {
@@ -558,7 +703,7 @@ function mapProviderSecret(secret: ProviderSecretReadinessRef): SetupCardViewMod
         label,
         status: "Missing",
         tone: "action",
-        message: `Enter a ${labelProvider(secret.provider)} key to continue.`,
+        message: `Optional fallback: enter a ${labelProvider(secret.provider)} key only when enabled.`,
         metadata: commonMetadata
       };
   }
@@ -616,6 +761,10 @@ export function createSafeSetupLogEvent(status: FirstRunSetupStatus, ready = fal
     updatedAt: status.updatedAt,
     productSessionStatus: status.productSession.status,
     googleOAuthStatus: status.googleOAuth.status,
+    platformProviderStatuses: (status.platformProviders ?? []).map((provider) => ({
+      provider: provider.provider,
+      status: provider.status
+    })),
     providerSecretStatuses: status.providerSecrets.map((secret) => ({
       provider: secret.provider,
       status: secret.status
@@ -656,6 +805,7 @@ export function summarizeSetupCoverage(statuses: readonly FirstRunSetupStatus[])
     return [
       viewModel.productSession,
       viewModel.googleOAuth,
+      ...viewModel.platformProviders,
       ...viewModel.providerSecrets,
       viewModel.resourceSession
     ];

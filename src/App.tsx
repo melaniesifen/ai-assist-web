@@ -48,6 +48,12 @@ import {
   reduceSseFrame,
   safeSessionStreamLogExcludesForbiddenContent
 } from "./session-stream";
+import {
+  createRealFlowClientDemoState,
+  createRealFlowClientViewModel,
+  safeRealFlowLogExcludesForbiddenContent,
+  type RealFlowClientViewModel
+} from "./real-flow-client";
 
 const EMPTY_CHAT_INPUT = "";
 
@@ -75,6 +81,7 @@ export function App(): ReactElement {
     () => createGoogleDocsReadinessDemoStates().map(createGoogleDocsReadinessViewModel),
     []
   );
+  const realFlowClient = useMemo(() => createRealFlowClientViewModel(createRealFlowClientDemoState()), []);
   const sessionStreamFrames = useMemo(createSessionStreamDemoFrames, []);
   const acceptedCommand = useMemo(createAcceptedCommandView, []);
   const contextModes = getAssistantDemoContextModeOptions();
@@ -152,16 +159,16 @@ export function App(): ReactElement {
           </header>
 
           <div className="setup-scenarios">
-            {setupScenarios.map((scenario) => (
-              <SetupScenario key={`${scenario.productSession.status}-${scenario.googleOAuth.status}`} scenario={scenario} />
+            {setupScenarios.map((scenario, index) => (
+              <SetupScenario key={`setup-scenario-${index}-${scenario.updatedAt}`} scenario={scenario} />
             ))}
           </div>
 
           <section className="setup-coverage" aria-label="First-run setup status coverage">
             <h3>Status coverage</h3>
             <ul>
-              {setupCoverageLabels.map((label) => (
-                <li key={label}>{label}</li>
+              {setupCoverageLabels.map((label, index) => (
+                <li key={`setup-coverage-${index}-${label}`}>{label}</li>
               ))}
             </ul>
           </section>
@@ -182,6 +189,8 @@ export function App(): ReactElement {
             ))}
           </div>
         </section>
+
+        <RealFlowClientPanel flow={realFlowClient} />
 
         <section className="session-stream-harness" aria-label="Session stream harness">
           <header className="setup-header">
@@ -664,6 +673,62 @@ function ReadinessScenario({ scenario }: { scenario: GoogleDocsReadinessViewMode
   );
 }
 
+function RealFlowClientPanel({ flow }: { flow: RealFlowClientViewModel }): ReactElement {
+  return (
+    <section className="real-flow-harness" aria-label="Real backend flow client states">
+      <header className="setup-header">
+        <div>
+          <p className="eyebrow">Real-flow clients</p>
+          <h2>HTTP and SSE state hardening</h2>
+        </div>
+        <span className="context-pill">Configurable endpoints</span>
+      </header>
+
+      <div className="real-flow-grid">
+        <article className="real-flow-summary">
+          <h3>Client wiring</h3>
+          <dl className="stream-metadata">
+            <div>
+              <dt>HTTP base</dt>
+              <dd>{flow.httpBaseUrl}</dd>
+            </div>
+            <div>
+              <dt>SSE stream</dt>
+              <dd>{flow.streamUrl}</dd>
+            </div>
+            <div>
+              <dt>Safe log</dt>
+              <dd>{safeRealFlowLogExcludesForbiddenContent(flow.safeLogEvent) ? "metadata only" : "blocked"}</dd>
+            </div>
+          </dl>
+        </article>
+
+        <div className="real-flow-steps" aria-label="Real backend flow status coverage">
+          {flow.steps.map((step) => (
+            <article className={`real-flow-step ${step.tone}`} key={step.id}>
+              <header>
+                <span>{step.label}</span>
+                <strong>{step.status}</strong>
+              </header>
+              <p>{step.message}</p>
+              <dl>
+                <div>
+                  <dt>Route</dt>
+                  <dd>{step.route}</dd>
+                </div>
+                <div>
+                  <dt>Retry</dt>
+                  <dd>{step.retryable ? "Available" : "Not available"}</dd>
+                </div>
+              </dl>
+            </article>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function SetupScenario({ scenario }: { scenario: FirstRunSetupViewModel }): ReactElement {
   return (
     <article className={`setup-scenario ${scenario.ready ? "ready" : "needs-action"}`}>
@@ -678,6 +743,9 @@ function SetupScenario({ scenario }: { scenario: FirstRunSetupViewModel }): Reac
       <div className="setup-card-grid">
         <SetupCard card={scenario.productSession} />
         <SetupCard card={scenario.googleOAuth} />
+        {scenario.platformProviders.map((provider) => (
+          <SetupCard card={provider} key={provider.id} />
+        ))}
         {scenario.providerSecrets.map((provider) => (
           <SetupCard card={provider} key={provider.id} />
         ))}

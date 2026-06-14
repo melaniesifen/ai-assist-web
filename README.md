@@ -23,6 +23,9 @@ safe-error behavior in pure TypeScript helpers with unit tests.
   `SELECTION`, `ACTIVE_RESOURCE`, consent states, normalized context metadata,
   reconnect-required, permission failures, and metadata-only client log events.
 - `src/session-events.ts`: reducer for SSE-style session events.
+- `src/real-flow-client.ts`: configurable backend-shaped HTTP/SSE route and
+  visible state helpers for trusted-user setup, ask/stream, review/apply, and
+  safe retry/error UI.
 - `src/proposed-actions.ts`: user-facing proposed-action state helpers.
 - `src/extension-surface.ts`: Google Docs browser-extension MVP surface
   contract for page support, document ID detection, backend ownership, and safe
@@ -137,6 +140,19 @@ failure code, provenance trust level, and truncation status.
 Tests import the real Google Docs read-path fixtures from
 `ai-assist-contracts` and validate the web mapper against the shared connector
 and normalized-context shapes.
+
+## Real-Flow UX Hardening Harness
+
+The local app renders backend-shaped client state for the trusted-user flow:
+product session, Google connect/callback/disconnect routes, platform provider
+availability, document readiness, command creation, SSE stream URL, action
+decision, and apply-action. The helper is configurable for real HTTP/SSE base
+URLs while default tests remain deterministic and fake-backed.
+
+The UI covers loading, retry, empty, disabled, permission or conflict style
+blocked states, safe retry guidance, and metadata-only client logs. Platform
+provider availability is the default setup path; BYO provider-key cards remain
+optional fallback state only.
 
 ## Task Breakdown
 
