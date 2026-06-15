@@ -9,13 +9,16 @@ export const DEFAULT_REAL_FLOW_ENDPOINTS = Object.freeze({
   commandCreate: "/api/assistant/commands",
   actionDecision: "/api/actions/decision",
   actionApply: "/api/actions/apply",
-  sessionStream: "/api/session-events/stream"
+  sessionStream: "/sessions/{sessionId}/events"
 });
+
+export const DEFAULT_REAL_FLOW_SESSION_ID = "session_deployed_shape";
 
 const SAFE_ERROR_MESSAGES: Readonly<Record<string, string>> = Object.freeze({
   AUTHENTICATION_EXPIRED: "Sign in again before continuing.",
   OAUTH_RECONNECT_REQUIRED: "Reconnect Google before using this document.",
   GOOGLE_PERMISSION_DENIED: "Google permission is missing for this document.",
+  AUTHORIZATION_DENIED: "This session is not authorized for the requested action.",
   PROVIDER_QUOTA_EXCEEDED: "Provider quota is temporarily limited. Retry later.",
   PROVIDER_UNAVAILABLE: "Provider access is temporarily unavailable.",
   STALE_DOCUMENT_REVISION: "The document changed. Refresh context before applying.",
@@ -86,6 +89,7 @@ export type RealFlowStepViewModel = {
 export type RealFlowClientState = {
   httpBaseUrl: string;
   sseBaseUrl: string;
+  sessionId: string;
   endpoints: RealFlowEndpointConfig;
   steps: readonly RealFlowStepRef[];
 };
@@ -93,6 +97,8 @@ export type RealFlowClientState = {
 export type RealFlowClientViewModel = {
   httpBaseUrl: string;
   streamUrl: string;
+  durableRefreshRoute: string;
+  sessionId: string;
   steps: readonly RealFlowStepViewModel[];
   safeLogEvent: RealFlowClientLogEvent;
 };
@@ -101,6 +107,7 @@ export type RealFlowClientLogEvent = {
   event: typeof REAL_FLOW_CLIENT_LOG_EVENT;
   httpBaseUrl: string;
   streamPath: string;
+  sessionId: string;
   stepStatuses: readonly {
     id: string;
     status: RealFlowStepStatus;
@@ -114,14 +121,35 @@ export function createRealFlowClientConfig(
 ): RealFlowEndpointConfig {
   return Object.freeze({
     ...DEFAULT_REAL_FLOW_ENDPOINTS,
-    ...overrides
+    ...definedEndpointOverrides(overrides)
   });
+}
+
+export function createRealFlowClientStateFromRuntimeEnv(env: Record<string, string | undefined>): RealFlowClientState {
+  return {
+    ...createRealFlowClientDemoState(),
+    httpBaseUrl: normalizeBaseUrl(env.VITE_API_BASE_URL, "http://localhost:8787"),
+    sseBaseUrl: normalizeBaseUrl(env.VITE_SSE_BASE_URL, normalizeBaseUrl(env.VITE_API_BASE_URL, "http://localhost:8787")),
+    sessionId: sanitizePathSegment(env.VITE_DEMO_SESSION_ID, DEFAULT_REAL_FLOW_SESSION_ID),
+    endpoints: createRealFlowClientConfig({
+      setupStatus: env.VITE_SETUP_STATUS_PATH,
+      googleConnect: env.VITE_GOOGLE_CONNECT_PATH,
+      googleCallback: env.VITE_GOOGLE_CALLBACK_PATH,
+      googleDisconnect: env.VITE_GOOGLE_DISCONNECT_PATH,
+      resourceSession: env.VITE_RESOURCE_SESSION_PATH,
+      commandCreate: env.VITE_COMMAND_CREATE_PATH,
+      actionDecision: env.VITE_ACTION_DECISION_PATH,
+      actionApply: env.VITE_ACTION_APPLY_PATH,
+      sessionStream: env.VITE_SESSION_STREAM_PATH
+    })
+  };
 }
 
 export function createRealFlowClientDemoState(): RealFlowClientState {
   return {
     httpBaseUrl: "http://localhost:8787",
     sseBaseUrl: "http://localhost:8787",
+    sessionId: DEFAULT_REAL_FLOW_SESSION_ID,
     endpoints: createRealFlowClientConfig(),
     steps: Object.freeze([
       {
@@ -143,10 +171,32 @@ export function createRealFlowClientDemoState(): RealFlowClientState {
         route: "setupStatus"
       },
       {
+        id: "expired-session",
+        label: "Expired session",
+        status: "retryable_error",
+        route: "setupStatus",
+        error: {
+          code: "AUTHENTICATION_EXPIRED",
+          category: "AUTHENTICATION",
+          retryable: true
+        }
+      },
+      {
         id: "document-readiness",
         label: "Document readiness",
         status: "empty",
         route: "resourceSession"
+      },
+      {
+        id: "denied-request",
+        label: "Denied request",
+        status: "blocked",
+        route: "actionDecision",
+        error: {
+          code: "AUTHORIZATION_DENIED",
+          category: "AUTHORIZATION",
+          retryable: false
+        }
       },
       {
         id: "ask-stream",
@@ -172,6 +222,28 @@ export function createRealFlowClientDemoState(): RealFlowClientState {
         }
       },
       {
+        id: "uncertain-mutation",
+        label: "Uncertain mutation",
+        status: "blocked",
+        route: "actionApply",
+        error: {
+          code: "UNCERTAIN_MUTATION_STATE",
+          category: "DEPENDENCY",
+          retryable: false
+        }
+      },
+      {
+        id: "provider-unavailable",
+        label: "Provider unavailable",
+        status: "retryable_error",
+        route: "commandCreate",
+        error: {
+          code: "PROVIDER_UNAVAILABLE",
+          category: "DEPENDENCY",
+          retryable: true
+        }
+      },
+      {
         id: "disconnect",
         label: "Google disconnect",
         status: "disabled",
@@ -185,7 +257,9 @@ export function createRealFlowClientDemoState(): RealFlowClientState {
 export function createRealFlowClientViewModel(state: RealFlowClientState): RealFlowClientViewModel {
   return {
     httpBaseUrl: state.httpBaseUrl,
-    streamUrl: joinUrl(state.sseBaseUrl, state.endpoints.sessionStream),
+    streamUrl: createSessionStreamUrl(state.sseBaseUrl, state.endpoints.sessionStream, state.sessionId),
+    durableRefreshRoute: state.endpoints.resourceSession,
+    sessionId: state.sessionId,
     steps: state.steps.map((step) => mapStep(step, state.endpoints)),
     safeLogEvent: createRealFlowClientLogEvent(state)
   };
@@ -196,6 +270,7 @@ export function createRealFlowClientLogEvent(state: RealFlowClientState): RealFl
     event: REAL_FLOW_CLIENT_LOG_EVENT,
     httpBaseUrl: state.httpBaseUrl,
     streamPath: state.endpoints.sessionStream,
+    sessionId: state.sessionId,
     stepStatuses: state.steps.map((step) => ({
       id: step.id,
       status: step.status,
@@ -203,6 +278,10 @@ export function createRealFlowClientLogEvent(state: RealFlowClientState): RealFl
       retryable: step.error?.retryable ?? false
     }))
   };
+}
+
+export function createSessionStreamUrl(baseUrl: string, pathTemplate: string, sessionId: string): string {
+  return joinUrl(baseUrl, pathTemplate.replace("{sessionId}", encodeURIComponent(sessionId)));
 }
 
 export function safeRealFlowLogExcludesForbiddenContent(event: RealFlowClientLogEvent): boolean {
@@ -287,4 +366,24 @@ function safeErrorMessage(error: RealFlowErrorRef | undefined): string {
 
 function joinUrl(baseUrl: string, path: string): string {
   return `${baseUrl.replace(/\/$/, "")}/${path.replace(/^\//, "")}`;
+}
+
+function normalizeBaseUrl(value: string | undefined, fallback: string): string {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed.replace(/\/$/, "") : fallback;
+}
+
+function sanitizePathSegment(value: string | undefined, fallback: string): string {
+  const trimmed = value?.trim();
+  if (!trimmed) {
+    return fallback;
+  }
+
+  return trimmed.replace(/[^a-zA-Z0-9_.:-]/g, "_");
+}
+
+function definedEndpointOverrides(overrides: Partial<Record<RealFlowEndpointKey, string | undefined>>): Partial<RealFlowEndpointConfig> {
+  return Object.fromEntries(
+    Object.entries(overrides).filter((entry): entry is [RealFlowEndpointKey, string] => typeof entry[1] === "string")
+  );
 }

@@ -154,6 +154,34 @@ blocked states, safe retry guidance, and metadata-only client logs. Platform
 provider availability is the default setup path; BYO provider-key cards remain
 optional fallback state only.
 
+For deployed-shaped validation, set Vite runtime env values before starting or
+building the frontend. Defaults keep local tests fake-backed and point at
+`http://localhost:8787`.
+
+```sh
+VITE_API_BASE_URL=https://api.dev.example.test \
+VITE_SSE_BASE_URL=https://events.dev.example.test \
+VITE_DEMO_SESSION_ID=session_dev \
+npm run dev
+```
+
+Optional route overrides are available without code changes:
+
+- `VITE_SETUP_STATUS_PATH`
+- `VITE_GOOGLE_CONNECT_PATH`
+- `VITE_GOOGLE_CALLBACK_PATH`
+- `VITE_GOOGLE_DISCONNECT_PATH`
+- `VITE_RESOURCE_SESSION_PATH`
+- `VITE_COMMAND_CREATE_PATH`
+- `VITE_ACTION_DECISION_PATH`
+- `VITE_ACTION_APPLY_PATH`
+- `VITE_SESSION_STREAM_PATH`
+
+The default SSE path is `/sessions/{sessionId}/events`, matching the M9
+long-lived browser `EventSource` route shape. After reconnect, duplicate event,
+malformed event, or sequence gap, the UI directs the user to refresh durable
+session state over HTTP before applying changes.
+
 ## Task Breakdown
 
 Implementation tasks are tracked in [TASKS.md](TASKS.md). Update the checkboxes there in the same change that implements or verifies a task.

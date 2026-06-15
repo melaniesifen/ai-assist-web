@@ -46,6 +46,12 @@ test("Sidebar demo works in Firefox", async ({ page }) => {
 test("Session stream demo renders SSE and proposed-action states in Firefox", async ({ page }) => {
   await page.goto("/");
 
+  const realFlowHarness = page.getByLabel("Real backend flow client states");
+  await expect(realFlowHarness.getByText("http://localhost:8787/sessions/session_deployed_shape/events")).toBeVisible();
+  await expect(realFlowHarness.getByText("After reconnect, duplicate event, malformed event, or sequence gap")).toBeVisible();
+  await expect(realFlowHarness.getByText("Expired session")).toBeVisible();
+  await expect(realFlowHarness.getByText("Provider unavailable")).toBeVisible();
+
   const streamHarness = page.getByLabel("Session stream harness");
   await expect(streamHarness).toBeVisible();
   await expect(streamHarness.getByText("No streamed progress yet.")).toBeVisible();

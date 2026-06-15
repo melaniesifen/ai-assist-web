@@ -111,6 +111,16 @@ Relevant design sources: frontend, provider-key, command, SSE, context, proposed
 - [x] M8-T5: Verify browser/client log helpers exclude forbidden sensitive content.
 - [x] M8-T5: Add responsive layout coverage for the real-flow state grid.
 
+## M9 Deployed-Backend UX Progress
+
+- [x] M9-T7: Verify web config can point at deployed HTTP and SSE endpoints through runtime env values without code changes.
+- [x] M9-T7: Verify setup UI covers deployed-shaped product session, Google connection, platform provider availability, document readiness, and reconnect states.
+- [x] M9-T7: Verify ask/stream/review/approve/reject/apply/conflict UI works with backend-shaped responses and SSE reducer behavior.
+- [x] M9-T7: Verify browser `EventSource` route shape, reconnect cursor display, duplicate-event dedupe, sequence-gap warning, and HTTP durable-state refresh guidance.
+- [x] M9-T7: Verify loading, retry, denied, quota, provider unavailable, stale document, uncertain mutation, and expired-session states.
+- [x] M9-T7: Verify responsive layout and accessibility basics through Firefox Playwright and Playwright MCP snapshots.
+- [x] M9-T7: Verify browser/client logs and diagnostics stay metadata-only.
+
 ## E2E-Owned UI Validation
 
 - [ ] E2E-001: Validate first-run onboarding UI for login, Google connection, provider-key entry, provider validation result, and Google resource-session start.

@@ -337,6 +337,16 @@ code {
   font-size: 0.86rem;
 }
 
+.refresh-guidance {
+  margin: 12px 0 0;
+  border: 1px solid #e6c76d;
+  border-radius: 6px;
+  padding: 8px 10px;
+  color: #5f4700;
+  background: var(--warning-bg);
+  font-size: 0.86rem;
+}
+
 .real-flow-step dl {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

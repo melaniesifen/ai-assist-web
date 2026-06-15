@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
+  DEFAULT_REAL_FLOW_SESSION_ID,
+  createSessionStreamUrl,
   createRealFlowClientConfig,
   createRealFlowClientDemoState,
   createRealFlowClientLogEvent,
+  createRealFlowClientStateFromRuntimeEnv,
   createRealFlowClientViewModel,
   safeRealFlowLogExcludesForbiddenContent,
   type RealFlowClientState
@@ -17,6 +20,7 @@ describe("real flow client helpers", () => {
     const state: RealFlowClientState = {
       httpBaseUrl: "http://localhost:9000/",
       sseBaseUrl: "http://localhost:9000/",
+      sessionId: "session-test",
       endpoints,
       steps: [
         {
@@ -39,6 +43,29 @@ describe("real flow client helpers", () => {
     });
   });
 
+  it("models deployed-shaped session stream URLs with session placeholders", () => {
+    expect(createSessionStreamUrl("https://events.example.test/", "/sessions/{sessionId}/events", "session/with space")).toBe(
+      "https://events.example.test/sessions/session%2Fwith%20space/events"
+    );
+  });
+
+  it("reads deployed backend config from runtime env values without code changes", () => {
+    const state = createRealFlowClientStateFromRuntimeEnv({
+      VITE_API_BASE_URL: "https://api.dev.example.test/",
+      VITE_SSE_BASE_URL: "https://events.dev.example.test/",
+      VITE_DEMO_SESSION_ID: "session/demo value",
+      VITE_COMMAND_CREATE_PATH: "/trusted/commands",
+      VITE_SESSION_STREAM_PATH: "/sessions/{sessionId}/events"
+    });
+    const viewModel = createRealFlowClientViewModel(state);
+
+    expect(viewModel.httpBaseUrl).toBe("https://api.dev.example.test");
+    expect(viewModel.sessionId).toBe("session_demo_value");
+    expect(viewModel.streamUrl).toBe("https://events.dev.example.test/sessions/session_demo_value/events");
+    expect(viewModel.steps.find((step) => step.id === "ask-stream")?.route).toBe("/trusted/commands");
+    expect(state.endpoints.setupStatus).toBe("/api/setup/status");
+  });
+
   it("covers loading, retry, empty, disabled, and blocked states", () => {
     const viewModel = createRealFlowClientViewModel(createRealFlowClientDemoState());
 
@@ -46,11 +73,17 @@ describe("real flow client helpers", () => {
       "Ready",
       "Loading",
       "Ready",
+      "Retry",
       "Empty",
+      "Blocked",
       "Retry",
       "Blocked",
+      "Blocked",
+      "Retry",
       "Disabled"
     ]);
+    expect(viewModel.streamUrl).toBe(`http://localhost:8787/sessions/${DEFAULT_REAL_FLOW_SESSION_ID}/events`);
+    expect(viewModel.durableRefreshRoute).toBe("/api/resources/google-docs/session");
     expect(viewModel.steps.find((step) => step.id === "ask-stream")).toMatchObject({
       retryable: true,
       message: "Provider quota is temporarily limited. Retry later. Retry after 30s."

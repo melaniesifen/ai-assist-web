@@ -49,7 +49,7 @@ import {
   safeSessionStreamLogExcludesForbiddenContent
 } from "./session-stream";
 import {
-  createRealFlowClientDemoState,
+  createRealFlowClientStateFromRuntimeEnv,
   createRealFlowClientViewModel,
   safeRealFlowLogExcludesForbiddenContent,
   type RealFlowClientViewModel
@@ -81,7 +81,10 @@ export function App(): ReactElement {
     () => createGoogleDocsReadinessDemoStates().map(createGoogleDocsReadinessViewModel),
     []
   );
-  const realFlowClient = useMemo(() => createRealFlowClientViewModel(createRealFlowClientDemoState()), []);
+  const realFlowClient = useMemo(
+    () => createRealFlowClientViewModel(createRealFlowClientStateFromRuntimeEnv(import.meta.env)),
+    []
+  );
   const sessionStreamFrames = useMemo(createSessionStreamDemoFrames, []);
   const acceptedCommand = useMemo(createAcceptedCommandView, []);
   const contextModes = getAssistantDemoContextModeOptions();
@@ -697,10 +700,22 @@ function RealFlowClientPanel({ flow }: { flow: RealFlowClientViewModel }): React
               <dd>{flow.streamUrl}</dd>
             </div>
             <div>
+              <dt>Session</dt>
+              <dd>{flow.sessionId}</dd>
+            </div>
+            <div>
+              <dt>Refresh</dt>
+              <dd>{flow.durableRefreshRoute}</dd>
+            </div>
+            <div>
               <dt>Safe log</dt>
               <dd>{safeRealFlowLogExcludesForbiddenContent(flow.safeLogEvent) ? "metadata only" : "blocked"}</dd>
             </div>
           </dl>
+          <p className="refresh-guidance">
+            After reconnect, duplicate event, malformed event, or sequence gap, refresh durable session state over HTTP
+            before applying changes.
+          </p>
         </article>
 
         <div className="real-flow-steps" aria-label="Real backend flow status coverage">
