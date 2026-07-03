@@ -1,14 +1,14 @@
 export const REAL_FLOW_CLIENT_LOG_EVENT = "real-flow-client-state";
 
 export const DEFAULT_REAL_FLOW_ENDPOINTS = Object.freeze({
-  setupStatus: "/api/setup/status",
-  googleConnect: "/api/auth/google/start",
-  googleCallback: "/api/auth/google/callback",
-  googleDisconnect: "/api/auth/google/disconnect",
-  resourceSession: "/api/resources/google-docs/session",
-  commandCreate: "/api/assistant/commands",
-  actionDecision: "/api/actions/decision",
-  actionApply: "/api/actions/apply",
+  setupStatus: "/setup/status",
+  googleConnect: "/oauth/google/start",
+  googleCallback: "/oauth/google/callback",
+  googleDisconnect: "/oauth/google/connection",
+  resourceSession: "/resource-sessions/{sessionId}",
+  commandCreate: "/resource-sessions/{sessionId}/commands",
+  actionDecision: "/resource-sessions/{sessionId}/actions/{actionId}/{decision}",
+  actionApply: "/resource-sessions/{sessionId}/apply-action",
   sessionStream: "/sessions/{sessionId}/events"
 });
 
@@ -71,6 +71,7 @@ export type RealFlowStepRef = {
   label: string;
   status: RealFlowStepStatus;
   route: RealFlowEndpointKey;
+  pathParams?: Partial<Record<"actionId" | "decision", string>>;
   error?: RealFlowErrorRef;
   disabledReason?: string;
   retryAfterSeconds?: number;
@@ -192,6 +193,10 @@ export function createRealFlowClientDemoState(): RealFlowClientState {
         label: "Denied request",
         status: "blocked",
         route: "actionDecision",
+        pathParams: {
+          actionId: "action_denied_demo",
+          decision: "approve"
+        },
         error: {
           code: "AUTHORIZATION_DENIED",
           category: "AUTHORIZATION",
@@ -258,9 +263,9 @@ export function createRealFlowClientViewModel(state: RealFlowClientState): RealF
   return {
     httpBaseUrl: state.httpBaseUrl,
     streamUrl: createSessionStreamUrl(state.sseBaseUrl, state.endpoints.sessionStream, state.sessionId),
-    durableRefreshRoute: state.endpoints.resourceSession,
+    durableRefreshRoute: materializeEndpointPath(state.endpoints.resourceSession, state.sessionId),
     sessionId: state.sessionId,
-    steps: state.steps.map((step) => mapStep(step, state.endpoints)),
+    steps: state.steps.map((step) => mapStep(step, state.endpoints, state.sessionId)),
     safeLogEvent: createRealFlowClientLogEvent(state)
   };
 }
@@ -281,7 +286,7 @@ export function createRealFlowClientLogEvent(state: RealFlowClientState): RealFl
 }
 
 export function createSessionStreamUrl(baseUrl: string, pathTemplate: string, sessionId: string): string {
-  return joinUrl(baseUrl, pathTemplate.replace("{sessionId}", encodeURIComponent(sessionId)));
+  return joinUrl(baseUrl, materializeEndpointPath(pathTemplate, sessionId));
 }
 
 export function safeRealFlowLogExcludesForbiddenContent(event: RealFlowClientLogEvent): boolean {
@@ -289,8 +294,8 @@ export function safeRealFlowLogExcludesForbiddenContent(event: RealFlowClientLog
   return REAL_FLOW_FORBIDDEN_LOG_PATTERNS.every((pattern) => !pattern.test(serialized));
 }
 
-function mapStep(step: RealFlowStepRef, endpoints: RealFlowEndpointConfig): RealFlowStepViewModel {
-  const route = endpoints[step.route];
+function mapStep(step: RealFlowStepRef, endpoints: RealFlowEndpointConfig, sessionId: string): RealFlowStepViewModel {
+  const route = materializeEndpointPath(endpoints[step.route], sessionId, step.pathParams);
 
   switch (step.status) {
     case "ready":
@@ -354,6 +359,17 @@ function mapStep(step: RealFlowStepRef, endpoints: RealFlowEndpointConfig): Real
         retryable: false
       };
   }
+}
+
+function materializeEndpointPath(
+  pathTemplate: string,
+  sessionId: string,
+  pathParams: Partial<Record<"actionId" | "decision", string>> = {}
+): string {
+  return pathTemplate
+    .replace("{sessionId}", encodeURIComponent(sessionId))
+    .replace("{actionId}", encodeURIComponent(pathParams.actionId ?? "action_deployed_shape"))
+    .replace("{decision}", encodeURIComponent(pathParams.decision ?? "approve"));
 }
 
 function safeErrorMessage(error: RealFlowErrorRef | undefined): string {

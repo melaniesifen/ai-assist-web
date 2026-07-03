@@ -165,6 +165,17 @@ VITE_DEMO_SESSION_ID=session_dev \
 npm run dev
 ```
 
+Without overrides, the deployed route templates are:
+
+- setup status: `/setup/status`
+- Google OAuth: `/oauth/google/start`, `/oauth/google/callback`,
+  `/oauth/google/connection`
+- durable session refresh: `/resource-sessions/{sessionId}`
+- command creation: `/resource-sessions/{sessionId}/commands`
+- action decision: `/resource-sessions/{sessionId}/actions/{actionId}/{decision}`
+- apply-action: `/resource-sessions/{sessionId}/apply-action`
+- SSE stream: `/sessions/{sessionId}/events`
+
 Optional route overrides are available without code changes:
 
 - `VITE_SETUP_STATUS_PATH`
@@ -177,10 +188,12 @@ Optional route overrides are available without code changes:
 - `VITE_ACTION_APPLY_PATH`
 - `VITE_SESSION_STREAM_PATH`
 
-The default SSE path is `/sessions/{sessionId}/events`, matching the M9
-long-lived browser `EventSource` route shape. After reconnect, duplicate event,
-malformed event, or sequence gap, the UI directs the user to refresh durable
-session state over HTTP before applying changes.
+The default paths intentionally do not include `/api` aliases; local proxy or
+hosting rewrites must adapt to these product routes rather than changing the
+frontend contract. The default SSE path is `/sessions/{sessionId}/events`,
+matching the M9 long-lived browser `EventSource` route shape. After reconnect,
+duplicate event, malformed event, or sequence gap, the UI directs the user to
+refresh durable session state over HTTP before applying changes.
 
 ## Task Breakdown
 

@@ -114,6 +114,7 @@ Relevant design sources: frontend, provider-key, command, SSE, context, proposed
 ## M9 Deployed-Backend UX Progress
 
 - [x] M9-T7: Verify web config can point at deployed HTTP and SSE endpoints through runtime env values without code changes.
+- [x] M9-T9 route/runtime contract slice: align deployed default route templates to canonical M9 paths without `/api` aliases: `/oauth/google/*`, `/resource-sessions/{sessionId}/*`, `/sessions/{sessionId}/events`, and apply/action routes. Environment overrides remain available for explicit deployment rewrites.
 - [x] M9-T7: Verify setup UI covers deployed-shaped product session, Google connection, platform provider availability, document readiness, and reconnect states.
 - [x] M9-T7: Verify ask/stream/review/approve/reject/apply/conflict UI works with backend-shaped responses and SSE reducer behavior.
 - [x] M9-T7: Verify browser `EventSource` route shape, reconnect cursor display, duplicate-event dedupe, sequence-gap warning, and HTTP durable-state refresh guidance.

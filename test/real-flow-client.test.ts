@@ -14,7 +14,7 @@ import {
 describe("real flow client helpers", () => {
   it("models configurable HTTP and SSE backend routes", () => {
     const endpoints = createRealFlowClientConfig({
-      commandCreate: "/internal/commands",
+      actionDecision: "/internal/sessions/{sessionId}/actions/{actionId}/{decision}",
       sessionStream: "/internal/sessions/stream"
     });
     const state: RealFlowClientState = {
@@ -27,7 +27,11 @@ describe("real flow client helpers", () => {
           id: "ask-stream",
           label: "Ask and stream",
           status: "ready",
-          route: "commandCreate"
+          route: "actionDecision",
+          pathParams: {
+            actionId: "action custom/demo",
+            decision: "reject"
+          }
         }
       ]
     };
@@ -37,7 +41,7 @@ describe("real flow client helpers", () => {
     expect(viewModel.streamUrl).toBe("http://localhost:9000/internal/sessions/stream");
     expect(viewModel.steps[0]).toMatchObject({
       label: "Ask and stream",
-      route: "/internal/commands",
+      route: "/internal/sessions/session-test/actions/action%20custom%2Fdemo/reject",
       status: "Ready",
       tone: "ready"
     });
@@ -63,7 +67,7 @@ describe("real flow client helpers", () => {
     expect(viewModel.sessionId).toBe("session_demo_value");
     expect(viewModel.streamUrl).toBe("https://events.dev.example.test/sessions/session_demo_value/events");
     expect(viewModel.steps.find((step) => step.id === "ask-stream")?.route).toBe("/trusted/commands");
-    expect(state.endpoints.setupStatus).toBe("/api/setup/status");
+    expect(state.endpoints.setupStatus).toBe("/setup/status");
   });
 
   it("covers loading, retry, empty, disabled, and blocked states", () => {
@@ -83,7 +87,16 @@ describe("real flow client helpers", () => {
       "Disabled"
     ]);
     expect(viewModel.streamUrl).toBe(`http://localhost:8787/sessions/${DEFAULT_REAL_FLOW_SESSION_ID}/events`);
-    expect(viewModel.durableRefreshRoute).toBe("/api/resources/google-docs/session");
+    expect(viewModel.durableRefreshRoute).toBe(`/resource-sessions/${DEFAULT_REAL_FLOW_SESSION_ID}`);
+    expect(viewModel.steps.find((step) => step.id === "ask-stream")?.route).toBe(
+      `/resource-sessions/${DEFAULT_REAL_FLOW_SESSION_ID}/commands`
+    );
+    expect(viewModel.steps.find((step) => step.id === "denied-request")?.route).toBe(
+      `/resource-sessions/${DEFAULT_REAL_FLOW_SESSION_ID}/actions/action_denied_demo/approve`
+    );
+    expect(viewModel.steps.find((step) => step.id === "apply-action")?.route).toBe(
+      `/resource-sessions/${DEFAULT_REAL_FLOW_SESSION_ID}/apply-action`
+    );
     expect(viewModel.steps.find((step) => step.id === "ask-stream")).toMatchObject({
       retryable: true,
       message: "Provider quota is temporarily limited. Retry later. Retry after 30s."
