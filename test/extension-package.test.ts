@@ -26,6 +26,7 @@ describe("extension package", () => {
     expect(firefoxManifest.manifest_version).toBe(2);
     expect(firefoxManifest.sidebar_action.default_panel).toBe("sidebar.html");
     expect(firefoxManifest.browser_action.default_title).toBe("Open AI Assist");
+    expect(firefoxManifest.browser_specific_settings.gecko.id).toBe("ai-assist-dogfood@melsifen-ai-assist.com");
     expect(firefoxManifest.permissions).toEqual(expect.arrayContaining(["identity", "storage", "tabs", "https://docs.google.com/document/*"]));
     expect(firefoxManifest.content_scripts[0]).toMatchObject({
       matches: ["https://docs.google.com/document/*"],

@@ -22,5 +22,10 @@
     "default_panel": "sidebar.html",
     "open_at_install": false
   },
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "ai-assist-dogfood@melsifen-ai-assist.com"
+    }
+  },
   "web_accessible_resources": ["dist/*", "dist/assets/*"]
 }

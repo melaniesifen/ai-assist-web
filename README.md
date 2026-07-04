@@ -191,6 +191,15 @@ matches the browser package being loaded:
 - Firefox temporary add-on:
   `https://<temporary-addon-id>.extensions.allizom.org/`
 
+The Firefox dogfood manifest sets a stable
+`browser_specific_settings.gecko.id` so `browser.identity.getRedirectURL()`
+stays stable across temporary add-on reloads. For the current dev Firefox
+package, the Cognito callback/logout URL is:
+
+```text
+https://bc695a95a18885fb3d7f6f61fea4f72e0be4b084.extensions.allizom.org/
+```
+
 After `AiAssistDevAuthStack` deploys, copy only non-secret outputs into the
 ignored extension config, rebuild the package, reload the extension, and then
 sign in from the sidebar. Do not use the committed examples as live proof while
