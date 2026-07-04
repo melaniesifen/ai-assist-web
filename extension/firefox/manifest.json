@@ -16,7 +16,7 @@
       "run_at": "document_idle"
     }
   ],
-  "permissions": ["activeTab", "storage", "tabs", "https://docs.google.com/document/*"],
+  "permissions": ["activeTab", "identity", "storage", "tabs", "https://docs.google.com/document/*"],
   "sidebar_action": {
     "default_title": "AI Assist",
     "default_panel": "sidebar.html",

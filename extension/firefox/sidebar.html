@@ -19,7 +19,7 @@
 
       .bridge {
         display: grid;
-        gap: 4px;
+        gap: 6px;
         border-bottom: 1px solid #d9dee8;
         background: #ffffff;
         padding: 10px 12px;
@@ -35,10 +35,39 @@
         overflow-wrap: anywhere;
       }
 
+      .auth-row {
+        align-items: center;
+        display: flex;
+        gap: 8px;
+        justify-content: space-between;
+      }
+
+      .auth-actions {
+        display: flex;
+        gap: 6px;
+      }
+
+      button {
+        border: 1px solid #b9c2d0;
+        border-radius: 6px;
+        background: #ffffff;
+        color: #1d2433;
+        cursor: pointer;
+        font: inherit;
+        font-weight: 700;
+        padding: 4px 8px;
+      }
+
+      button.primary {
+        border-color: #1d4ed8;
+        background: #1d4ed8;
+        color: #ffffff;
+      }
+
       iframe {
         display: block;
         width: 100%;
-        height: calc(100vh - 76px);
+        height: calc(100vh - 112px);
         border: 0;
         background: #ffffff;
       }
@@ -49,6 +78,13 @@
       <div><span class="label">Document</span> <span class="value" id="document-id">Detecting...</span></div>
       <div><span class="label">HTTP</span> <span class="value" id="api-base-url">Loading...</span></div>
       <div><span class="label">SSE</span> <span class="value" id="sse-base-url">Loading...</span></div>
+      <div class="auth-row">
+        <div><span class="label">Product login</span> <span class="value" id="product-auth-status">Checking...</span></div>
+        <div class="auth-actions">
+          <button class="primary" id="product-sign-in" type="button">Sign in</button>
+          <button id="product-sign-out" type="button">Sign out</button>
+        </div>
+      </div>
     </section>
     <iframe id="assistant-app" title="AI Assist sidebar"></iframe>
     <script src="sidebar.js"></script>

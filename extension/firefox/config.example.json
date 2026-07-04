@@ -2,5 +2,11 @@
   "apiBaseUrl": "https://api.dev.example.test",
   "sseBaseUrl": "https://sse.dev.melsifen-ai-assist.com",
   "supportingWebOrigin": "https://dev.melsifen-ai-assist.com",
-  "defaultSessionId": "session-dogfood-dev"
+  "defaultSessionId": "session-dogfood-dev",
+  "cognitoAuthBaseUrl": "https://ai-assist-dev.auth.us-west-2.amazoncognito.com",
+  "cognitoClientId": "replace-with-dev-public-app-client-id",
+  "cognitoRedirectUri": "https://replace-with-extension-id.extensions.allizom.org/",
+  "cognitoLogoutRedirectUri": "https://replace-with-extension-id.extensions.allizom.org/",
+  "cognitoScopes": ["openid", "email", "profile"],
+  "cognitoResponseType": "token"
 }

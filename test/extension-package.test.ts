@@ -3,6 +3,7 @@ import chromeManifest from "../extension/manifest.json";
 import chromeConfig from "../extension/config.example.json";
 import chromeContentScript from "../extension/content-script.js?raw";
 import chromeSidepanelScript from "../extension/sidepanel.js?raw";
+import chromeServiceWorkerScript from "../extension/service-worker.js?raw";
 import firefoxManifest from "../extension/firefox/manifest.json";
 import firefoxConfig from "../extension/firefox/config.example.json";
 import firefoxBackgroundScript from "../extension/firefox/background.js?raw";
@@ -13,7 +14,7 @@ describe("extension package", () => {
   it("defines an installable Chrome side-panel shell for Google Docs documents", () => {
     expect(chromeManifest.manifest_version).toBe(3);
     expect(chromeManifest.side_panel.default_path).toBe("sidepanel.html");
-    expect(chromeManifest.permissions).toEqual(expect.arrayContaining(["sidePanel", "storage", "tabs"]));
+    expect(chromeManifest.permissions).toEqual(expect.arrayContaining(["identity", "sidePanel", "storage", "tabs"]));
     expect(chromeManifest.host_permissions).toEqual(["https://docs.google.com/document/*"]);
     expect(chromeManifest.content_scripts[0]).toMatchObject({
       matches: ["https://docs.google.com/document/*"],
@@ -25,7 +26,7 @@ describe("extension package", () => {
     expect(firefoxManifest.manifest_version).toBe(2);
     expect(firefoxManifest.sidebar_action.default_panel).toBe("sidebar.html");
     expect(firefoxManifest.browser_action.default_title).toBe("Open AI Assist");
-    expect(firefoxManifest.permissions).toEqual(expect.arrayContaining(["storage", "tabs", "https://docs.google.com/document/*"]));
+    expect(firefoxManifest.permissions).toEqual(expect.arrayContaining(["identity", "storage", "tabs", "https://docs.google.com/document/*"]));
     expect(firefoxManifest.content_scripts[0]).toMatchObject({
       matches: ["https://docs.google.com/document/*"],
       js: ["content-script.js"]
@@ -40,8 +41,11 @@ describe("extension package", () => {
       expect(config.apiBaseUrl).toBe("https://api.dev.example.test");
       expect(config.sseBaseUrl).toBe("https://sse.dev.melsifen-ai-assist.com");
       expect(config.supportingWebOrigin).toBe("https://dev.melsifen-ai-assist.com");
+      expect(config.cognitoAuthBaseUrl).toMatch(/^https:\/\/ai-assist-dev\.auth\.us-west-2\.amazoncognito\.com$/);
+      expect(config.cognitoClientId).toBe("replace-with-dev-public-app-client-id");
+      expect(config.cognitoResponseType).toBe("token");
       expect(serializedConfig).not.toMatch(/execute-api/i);
-      expect(serializedConfig).not.toMatch(/bearer|oauth|token|secret|api[_-]?key|sk-/i);
+      expect(serializedConfig).not.toMatch(/bearer|id_token|access_token|refresh_token|secret|api[_-]?key|sk-/i);
     }
   });
 
@@ -54,7 +58,42 @@ describe("extension package", () => {
 
     for (const panelScript of [chromeSidepanelScript, firefoxSidebarScript]) {
       expect(panelScript).toContain("documentId");
+      expect(panelScript).toContain("productAuthStatus");
+      expect(panelScript).not.toContain("idToken");
+      expect(panelScript).not.toContain("accessToken");
       expect(panelScript).not.toMatch(/innerText|document\.body|querySelectorAll/i);
     }
+  });
+
+  it("supports Cognito Hosted UI login without putting bearer values in the sidebar iframe URL", () => {
+    expect(chromeSidepanelScript).toContain("AI_ASSIST_PRODUCT_SIGN_IN");
+    expect(chromeSidepanelScript).toContain("AI_ASSIST_PRODUCT_SIGN_OUT");
+    expect(firefoxSidebarScript).toContain("AI_ASSIST_PRODUCT_SIGN_IN");
+    expect(firefoxSidebarScript).toContain("AI_ASSIST_PRODUCT_SIGN_OUT");
+
+    expect(chromeSidepanelScript).not.toMatch(/id_token|access_token|Authorization|Bearer/);
+    expect(firefoxSidebarScript).not.toMatch(/id_token|access_token|Authorization|Bearer/);
+    expect(chromeSidepanelScript).toContain("appUrl.searchParams.set(\"productAuthStatus\"");
+    expect(firefoxSidebarScript).toContain("appUrl.searchParams.set(\"productAuthStatus\"");
+  });
+
+  it("keeps extension-side product auth token handling inside background boundaries", () => {
+    expect(chromeSidepanelScript).not.toContain("chrome.storage");
+    expect(firefoxSidebarScript).not.toContain("browser.storage");
+
+    expect(chromeManifest.permissions).toContain("identity");
+    expect(firefoxManifest.permissions).toContain("identity");
+    expect(chromeServiceWorkerScript).toContain("params.get(\"state\") !== expectedState");
+    expect(firefoxBackgroundScript).toContain("params.get(\"state\") !== expectedState");
+    expect(firefoxBackgroundScript).toContain("let productAuthState");
+  });
+
+  it("validates Hosted UI state before extension backgrounds accept ID tokens", () => {
+    expect(chromeServiceWorkerScript).toContain("parseHostedUiRedirect(redirectUrl, expectedState)");
+    expect(chromeServiceWorkerScript).toContain("errorCode: \"state_mismatch\"");
+    expect(chromeServiceWorkerScript).toContain("errorCode: \"id_token_required\"");
+    expect(firefoxBackgroundScript).toContain("parseHostedUiRedirect(redirectUrl, expectedState)");
+    expect(firefoxBackgroundScript).toContain("errorCode: \"state_mismatch\"");
+    expect(firefoxBackgroundScript).toContain("errorCode: \"id_token_required\"");
   });
 });

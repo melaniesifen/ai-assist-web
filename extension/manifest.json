@@ -18,7 +18,7 @@
     }
   ],
   "host_permissions": ["https://docs.google.com/document/*"],
-  "permissions": ["activeTab", "sidePanel", "storage", "tabs"],
+  "permissions": ["activeTab", "identity", "sidePanel", "storage", "tabs"],
   "side_panel": {
     "default_path": "sidepanel.html"
   },

@@ -167,6 +167,31 @@ cp extension/config.example.json extension/config.dev.json
 cp extension/firefox/config.example.json extension/firefox/config.dev.json
 ```
 
+M11 product login uses Cognito Hosted UI from the sidebar/side-panel. The
+extension launches Hosted UI through the browser identity API, so invited users
+can complete Cognito's first-login password setup in the Cognito window and
+return to the authenticated sidebar without AWS CLI password commands. Configure
+the ignored local extension config with non-secret Cognito values from the
+`AiAssistDevAuthStack` outputs:
+
+- `cognitoAuthBaseUrl`: the deployed Cognito Hosted UI domain origin.
+- `cognitoClientId`: the public app client ID.
+- `cognitoRedirectUri`: the browser extension identity redirect URI registered
+  on the Cognito app client callback URLs.
+- `cognitoLogoutRedirectUri`: the matching registered logout URL.
+- `cognitoScopes`: `openid`, `email`, and `profile` for product identity.
+- `cognitoResponseType`: `token` for the current public-client sidebar flow.
+
+Chrome stores returned product-auth tokens in extension session storage. Firefox
+keeps them in the extension background page memory for the temporary add-on
+session because Firefox MV2 does not provide the same session storage boundary.
+The sidebar sends only auth status and endpoint metadata to the embedded app URL;
+it does not put ID tokens, access tokens, refresh tokens, OAuth tokens, provider
+keys, document text, prompts, or model output in query strings, logs, or
+committed config. Backend product-route calls must request the bearer value from
+the extension background boundary and send it as an `Authorization: Bearer ...`
+header. Google OAuth remains a separate step after product login.
+
 For deployed dogfood builds, pass matching Vite runtime env values without
 committing the endpoint:
 

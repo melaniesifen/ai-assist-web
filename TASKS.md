@@ -133,6 +133,22 @@ Relevant design sources: frontend, provider-key, command, SSE, context, proposed
 - [x] M10-T2 follow-up: Add a Firefox WebExtension sidebar package and dev build script so owner dogfooding does not require Chrome.
 - [x] M10-T5 web slice: Add deterministic deployed-shaped SSE route coverage for `progress`, `assistant.delta`, `assistant.final`, `action.proposed`, `action.status_changed`, `error`, `Last-Event-ID`, duplicate suppression across reconnect state, malformed-event handling, and durable refresh guidance.
 
+## M11 Sidebar Cognito Login Progress
+
+- [x] M11-T5.1: Choose Cognito Hosted UI as the sidebar product-login path so
+  invited dev users can complete Cognito temporary-password setup in the hosted
+  sign-in window instead of using AWS CLI password commands.
+- [x] M11-T5.1: Add Chrome and Firefox extension Hosted UI sign-in/sign-out
+  controls, identity permission wiring, non-secret Cognito config examples, and
+  extension-scoped product-auth token handling.
+- [x] M11-T5.1: Add deterministic tests for Hosted UI URL construction,
+  redirect state parsing, expired and access-denied states, bearer-token request
+  construction, and sidebar URL/token boundaries.
+- [ ] M11-T5.1 deployed follow-up: Register the actual extension identity
+  redirect/logout URLs on the Cognito app client and populate ignored
+  `config.dev.json` files from `AiAssistDevAuthStack` outputs before live
+  sidebar sign-in proof.
+
 ## E2E-Owned UI Validation
 
 - [ ] E2E-001: Validate first-run onboarding UI for login, Google connection, provider-key entry, provider validation result, and Google resource-session start.

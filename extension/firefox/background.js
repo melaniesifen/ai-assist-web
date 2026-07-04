@@ -1,5 +1,11 @@
 const CONFIG_STORAGE_KEY = "aiAssistDogfoodConfig";
 const DOCUMENT_CONTEXT_STORAGE_KEY = "aiAssistActiveDocumentContext";
+const PRODUCT_AUTH_SCOPES = ["openid", "email", "profile"];
+let productAuthState = {
+  status: "signed_out",
+  displayName: "Signed out",
+  message: "Sign in with Cognito before connecting Google."
+};
 
 browser.runtime.onInstalled.addListener(async () => {
   const config = await loadDevConfig();
@@ -17,6 +23,22 @@ browser.runtime.onMessage.addListener((message, sender) => {
 
   if (message?.type === "AI_ASSIST_GET_RUNTIME_CONTEXT") {
     return readRuntimeContext().then((context) => ({ ok: true, context }));
+  }
+
+  if (message?.type === "AI_ASSIST_PRODUCT_SIGN_IN") {
+    return signInWithCognitoHostedUi().then((auth) => ({ ok: true, auth: publicAuthState(auth) }));
+  }
+
+  if (message?.type === "AI_ASSIST_PRODUCT_SIGN_OUT") {
+    return signOutProductAuth().then((auth) => ({ ok: true, auth }));
+  }
+
+  if (message?.type === "AI_ASSIST_PRODUCT_AUTH_STATE") {
+    return readProductAuthState().then((auth) => ({ ok: true, auth: publicAuthState(auth) }));
+  }
+
+  if (message?.type === "AI_ASSIST_GET_AUTHORIZATION_HEADER") {
+    return readAuthorizationHeader().then((authorization) => ({ ok: true, authorization }));
   }
 
   return false;
@@ -54,10 +76,165 @@ async function readRuntimeContext() {
   const [activeTab] = await browser.tabs.query({ active: true, currentWindow: true });
   const stored = await browser.storage.local.get(CONFIG_STORAGE_KEY);
   const session = await browser.storage.local.get(DOCUMENT_CONTEXT_STORAGE_KEY);
+  const auth = await readProductAuthState();
 
   return {
     config: stored[CONFIG_STORAGE_KEY] ?? (await loadDevConfig()),
     documentContext: session[DOCUMENT_CONTEXT_STORAGE_KEY] ?? null,
-    activeTabUrl: activeTab?.url ?? null
+    activeTabUrl: activeTab?.url ?? null,
+    productAuth: publicAuthState(auth)
   };
+}
+
+async function signInWithCognitoHostedUi() {
+  const config = await loadConfigFromStorage();
+  const expectedState = crypto.randomUUID();
+  const redirectUrl = await browser.identity.launchWebAuthFlow({
+    url: createHostedUiUrl(config, expectedState),
+    interactive: true
+  });
+  productAuthState = parseHostedUiRedirect(redirectUrl, expectedState);
+  return productAuthState;
+}
+
+async function signOutProductAuth() {
+  const config = await loadConfigFromStorage();
+  productAuthState = {
+    status: "signed_out",
+    displayName: "Signed out",
+    message: "Sign in with Cognito before connecting Google."
+  };
+
+  if (hasCognitoConfig(config)) {
+    await browser.identity
+      .launchWebAuthFlow({
+        url: createLogoutUrl(config),
+        interactive: false
+      })
+      .catch(() => null);
+  }
+
+  return productAuthState;
+}
+
+async function readProductAuthState() {
+  if (productAuthState.status !== "signed_in") {
+    return productAuthState;
+  }
+
+  if (Number(productAuthState.tokens?.expiresAtEpochMs) <= Date.now()) {
+    productAuthState = {
+      status: "auth_expired",
+      displayName: "Auth expired",
+      message: "Product login expired. Sign in again before using backend routes."
+    };
+  }
+
+  return productAuthState;
+}
+
+async function readAuthorizationHeader() {
+  const auth = await readProductAuthState();
+  if (auth.status !== "signed_in" || !auth.tokens?.idToken) {
+    return null;
+  }
+  return `Bearer ${auth.tokens.idToken}`;
+}
+
+async function loadConfigFromStorage() {
+  const stored = await browser.storage.local.get(CONFIG_STORAGE_KEY);
+  return stored[CONFIG_STORAGE_KEY] ?? (await loadDevConfig());
+}
+
+function createHostedUiUrl(config, state) {
+  assertCognitoConfig(config);
+  const url = new URL("/oauth2/authorize", trimTrailingSlash(config.cognitoAuthBaseUrl));
+  url.searchParams.set("client_id", config.cognitoClientId);
+  url.searchParams.set("redirect_uri", config.cognitoRedirectUri);
+  url.searchParams.set("response_type", config.cognitoResponseType ?? "token");
+  url.searchParams.set("scope", Array.isArray(config.cognitoScopes) ? config.cognitoScopes.join(" ") : PRODUCT_AUTH_SCOPES.join(" "));
+  url.searchParams.set("state", state);
+  return url.toString();
+}
+
+function createLogoutUrl(config) {
+  assertCognitoConfig(config);
+  const url = new URL("/logout", trimTrailingSlash(config.cognitoAuthBaseUrl));
+  url.searchParams.set("client_id", config.cognitoClientId);
+  url.searchParams.set("logout_uri", config.cognitoLogoutRedirectUri ?? config.cognitoRedirectUri);
+  return url.toString();
+}
+
+function parseHostedUiRedirect(redirectUrl, expectedState) {
+  const url = new URL(redirectUrl);
+  const params = new URLSearchParams(url.hash.startsWith("#") ? url.hash.slice(1) : url.search);
+
+  if (!expectedState || params.get("state") !== expectedState) {
+    return {
+      status: "access_denied",
+      displayName: "Access denied",
+      message: "Cognito sign-in response did not match this browser sign-in attempt.",
+      errorCode: "state_mismatch"
+    };
+  }
+
+  const error = params.get("error");
+
+  if (error) {
+    return {
+      status: error === "access_denied" ? "access_denied" : "signed_out",
+      displayName: error === "access_denied" ? "Access denied" : "Signed out",
+      message: params.get("error_description") ?? "Cognito did not complete sign-in.",
+      errorCode: error
+    };
+  }
+
+  const idToken = params.get("id_token");
+  const accessToken = params.get("access_token");
+  const expiresInSeconds = Number(params.get("expires_in") ?? "3600");
+
+  if (!idToken) {
+    return {
+      status: "signed_out",
+      displayName: "Signed out",
+      message: "Cognito sign-in did not return a usable product identity token.",
+      errorCode: "id_token_required"
+    };
+  }
+
+  return {
+    status: "signed_in",
+    displayName: "Signed in",
+    message: "Product login is active. Google OAuth remains a separate next step.",
+    tokens: {
+      idToken,
+      accessToken,
+      expiresAtEpochMs: Date.now() + Math.max(0, expiresInSeconds) * 1000
+    }
+  };
+}
+
+function publicAuthState(auth) {
+  const { tokens: _tokens, ...publicAuth } = auth ?? {};
+  return publicAuth.status
+    ? publicAuth
+    : {
+        status: "signed_out",
+        displayName: "Signed out",
+        message: "Sign in with Cognito before connecting Google."
+      };
+}
+
+function assertCognitoConfig(config) {
+  if (!hasCognitoConfig(config)) {
+    throw new Error("Cognito Hosted UI base URL, client ID, and redirect URI are required.");
+  }
+}
+
+function hasCognitoConfig(config) {
+  return Boolean(config?.cognitoAuthBaseUrl && config?.cognitoClientId && config?.cognitoRedirectUri);
+}
+
+function trimTrailingSlash(value) {
+  return value.endsWith("/") ? value.slice(0, -1) : value;
 }
