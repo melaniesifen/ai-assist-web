@@ -182,6 +182,20 @@ the ignored local extension config with non-secret Cognito values from the
 - `cognitoScopes`: `openid`, `email`, and `profile` for product identity.
 - `cognitoResponseType`: `token` for the current public-client sidebar flow.
 
+Before live sidebar sign-in proof, the infra auth stack must be deployed with
+the actual extension identity redirect URLs in ignored
+`ai-assist-infra/cdk.context.json`. Use the registered callback/logout URL that
+matches the browser package being loaded:
+
+- Chrome: `https://<chrome-extension-id>.chromiumapp.org/`
+- Firefox temporary add-on:
+  `https://<temporary-addon-id>.extensions.allizom.org/`
+
+After `AiAssistDevAuthStack` deploys, copy only non-secret outputs into the
+ignored extension config, rebuild the package, reload the extension, and then
+sign in from the sidebar. Do not use the committed examples as live proof while
+they still contain placeholder extension IDs.
+
 Chrome stores returned product-auth tokens in extension session storage. Firefox
 keeps them in the extension background page memory for the temporary add-on
 session because Firefox MV2 does not provide the same session storage boundary.

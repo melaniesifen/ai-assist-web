@@ -3,7 +3,7 @@
   "sseBaseUrl": "https://sse.dev.melsifen-ai-assist.com",
   "supportingWebOrigin": "https://dev.melsifen-ai-assist.com",
   "defaultSessionId": "session-dogfood-dev",
-  "cognitoAuthBaseUrl": "https://ai-assist-dev.auth.us-west-2.amazoncognito.com",
+  "cognitoAuthBaseUrl": "https://ai-assist-dev-us-west-2-product-auth.auth.us-west-2.amazoncognito.com",
   "cognitoClientId": "replace-with-dev-public-app-client-id",
   "cognitoRedirectUri": "https://replace-with-extension-id.chromiumapp.org/",
   "cognitoLogoutRedirectUri": "https://replace-with-extension-id.chromiumapp.org/",

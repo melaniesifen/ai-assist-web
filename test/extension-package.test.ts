@@ -41,7 +41,7 @@ describe("extension package", () => {
       expect(config.apiBaseUrl).toBe("https://api.dev.example.test");
       expect(config.sseBaseUrl).toBe("https://sse.dev.melsifen-ai-assist.com");
       expect(config.supportingWebOrigin).toBe("https://dev.melsifen-ai-assist.com");
-      expect(config.cognitoAuthBaseUrl).toMatch(/^https:\/\/ai-assist-dev\.auth\.us-west-2\.amazoncognito\.com$/);
+      expect(config.cognitoAuthBaseUrl).toMatch(/^https:\/\/ai-assist-dev-us-west-2-product-auth\.auth\.us-west-2\.amazoncognito\.com$/);
       expect(config.cognitoClientId).toBe("replace-with-dev-public-app-client-id");
       expect(config.cognitoResponseType).toBe("token");
       expect(serializedConfig).not.toMatch(/execute-api/i);

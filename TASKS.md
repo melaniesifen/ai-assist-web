@@ -144,6 +144,9 @@ Relevant design sources: frontend, provider-key, command, SSE, context, proposed
 - [x] M11-T5.1: Add deterministic tests for Hosted UI URL construction,
   redirect state parsing, expired and access-denied states, bearer-token request
   construction, and sidebar URL/token boundaries.
+- [x] M11-T5.2 web config docs: document the CDK-owned Hosted UI outputs,
+  extension identity redirect URL shapes, ignored config update, rebuild, and
+  reload steps needed before sidebar sign-in proof.
 - [ ] M11-T5.1 deployed follow-up: Register the actual extension identity
   redirect/logout URLs on the Cognito app client and populate ignored
   `config.dev.json` files from `AiAssistDevAuthStack` outputs before live
