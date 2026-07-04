@@ -7,6 +7,7 @@
   "cognitoClientId": "replace-with-dev-public-app-client-id",
   "cognitoRedirectUri": "https://replace-with-extension-id.chromiumapp.org/",
   "cognitoLogoutRedirectUri": "https://replace-with-extension-id.chromiumapp.org/",
+  "googleOAuthRedirectTarget": "https://replace-with-extension-id.chromiumapp.org/",
   "cognitoScopes": ["openid", "email", "profile"],
   "cognitoResponseType": "token"
 }

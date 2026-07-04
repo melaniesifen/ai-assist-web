@@ -151,6 +151,15 @@ Relevant design sources: frontend, provider-key, command, SSE, context, proposed
   redirect/logout URLs on the Cognito app client and populate ignored
   `config.dev.json` files from `AiAssistDevAuthStack` outputs before live
   sidebar sign-in proof.
+- [x] M11-T5.3: Add Chrome and Firefox sidebar Google connect controls after
+  product sign-in, background-owned bearer calls to `/oauth/google/start` and
+  `/oauth/google/status`, extension identity redirect-target handling, and safe
+  connected/reconnect/access-denied/auth-expired/dependency states without
+  leaking tokens into iframe URLs or logs.
+- [ ] M11-T5.3 deployed follow-up: Redeploy the runtime with extension callback
+  URLs in `ALLOWED_ORIGINS`, populate ignored extension config from stack
+  outputs, and complete owner-approved live Google OAuth proof before read
+  smoke.
 
 ## E2E-Owned UI Validation
 

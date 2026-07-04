@@ -67,7 +67,7 @@
       iframe {
         display: block;
         width: 100%;
-        height: calc(100vh - 112px);
+        height: calc(100vh - 148px);
         border: 0;
         background: #ffffff;
       }
@@ -83,6 +83,12 @@
         <div class="auth-actions">
           <button class="primary" id="product-sign-in" type="button">Sign in</button>
           <button id="product-sign-out" type="button">Sign out</button>
+        </div>
+      </div>
+      <div class="auth-row">
+        <div><span class="label">Google</span> <span class="value" id="google-oauth-status">Checking...</span></div>
+        <div class="auth-actions">
+          <button class="primary" id="google-connect" type="button">Connect Google</button>
         </div>
       </div>
     </section>

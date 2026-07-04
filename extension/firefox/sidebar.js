@@ -4,10 +4,13 @@ const SSE_BASE_URL_ELEMENT = document.querySelector("#sse-base-url");
 const PRODUCT_AUTH_STATUS_ELEMENT = document.querySelector("#product-auth-status");
 const PRODUCT_SIGN_IN_BUTTON = document.querySelector("#product-sign-in");
 const PRODUCT_SIGN_OUT_BUTTON = document.querySelector("#product-sign-out");
+const GOOGLE_OAUTH_STATUS_ELEMENT = document.querySelector("#google-oauth-status");
+const GOOGLE_CONNECT_BUTTON = document.querySelector("#google-connect");
 const ASSISTANT_APP_FRAME = document.querySelector("#assistant-app");
 
 PRODUCT_SIGN_IN_BUTTON.addEventListener("click", () => runProductAuthAction("AI_ASSIST_PRODUCT_SIGN_IN"));
 PRODUCT_SIGN_OUT_BUTTON.addEventListener("click", () => runProductAuthAction("AI_ASSIST_PRODUCT_SIGN_OUT"));
+GOOGLE_CONNECT_BUTTON.addEventListener("click", () => runGoogleConnectAction());
 
 loadRuntimeContext();
 
@@ -20,18 +23,21 @@ async function loadRuntimeContext() {
   }
 
   const { config, documentContext, activeTabUrl } = response.context;
-  renderBridge(config, documentContext, response.context.productAuth);
-  openAssistantApp(config, documentContext, activeTabUrl, response.context.productAuth);
+  renderBridge(config, documentContext, response.context.productAuth, response.context.googleOAuth);
+  openAssistantApp(config, documentContext, activeTabUrl, response.context.productAuth, response.context.googleOAuth);
 }
 
-function renderBridge(config, documentContext, productAuth) {
+function renderBridge(config, documentContext, productAuth, googleOAuth) {
   DOCUMENT_ID_ELEMENT.textContent = documentContext?.documentId ?? "No supported Google Doc detected.";
   API_BASE_URL_ELEMENT.textContent = config.apiBaseUrl;
   SSE_BASE_URL_ELEMENT.textContent = config.sseBaseUrl;
   PRODUCT_AUTH_STATUS_ELEMENT.textContent = formatProductAuthStatus(productAuth);
+  GOOGLE_OAUTH_STATUS_ELEMENT.textContent = formatGoogleOAuthStatus(googleOAuth);
+  GOOGLE_CONNECT_BUTTON.disabled = productAuth?.status !== "signed_in" || googleOAuth?.status === "connecting";
+  GOOGLE_CONNECT_BUTTON.textContent = googleOAuth?.status === "reconnect_required" ? "Reconnect Google" : "Connect Google";
 }
 
-function openAssistantApp(config, documentContext, activeTabUrl, productAuth) {
+function openAssistantApp(config, documentContext, activeTabUrl, productAuth, googleOAuth) {
   const appUrl = new URL(browser.runtime.getURL("dist/index.html"));
   appUrl.searchParams.set("documentId", documentContext?.documentId ?? "");
   appUrl.searchParams.set("activeTabUrl", activeTabUrl ?? "");
@@ -39,6 +45,7 @@ function openAssistantApp(config, documentContext, activeTabUrl, productAuth) {
   appUrl.searchParams.set("sseBaseUrl", config.sseBaseUrl);
   appUrl.searchParams.set("sessionId", config.defaultSessionId);
   appUrl.searchParams.set("productAuthStatus", productAuth?.status ?? "signed_out");
+  appUrl.searchParams.set("googleOAuthStatus", googleOAuth?.status ?? "not_connected");
   ASSISTANT_APP_FRAME.src = appUrl.toString();
 }
 
@@ -47,6 +54,8 @@ function renderBridgeError(message) {
   API_BASE_URL_ELEMENT.textContent = "Unavailable";
   SSE_BASE_URL_ELEMENT.textContent = "Unavailable";
   PRODUCT_AUTH_STATUS_ELEMENT.textContent = "Unavailable";
+  GOOGLE_OAUTH_STATUS_ELEMENT.textContent = "Unavailable";
+  GOOGLE_CONNECT_BUTTON.disabled = true;
 }
 
 async function runProductAuthAction(type) {
@@ -55,6 +64,20 @@ async function runProductAuthAction(type) {
 
   if (!response?.ok) {
     PRODUCT_AUTH_STATUS_ELEMENT.textContent = response?.error ?? "Product login action failed.";
+    return;
+  }
+
+  await loadRuntimeContext();
+}
+
+async function runGoogleConnectAction() {
+  GOOGLE_OAUTH_STATUS_ELEMENT.textContent = "Opening Google authorization...";
+  GOOGLE_CONNECT_BUTTON.disabled = true;
+  const response = await browser.runtime.sendMessage({ type: "AI_ASSIST_GOOGLE_CONNECT" });
+
+  if (!response?.ok) {
+    GOOGLE_OAUTH_STATUS_ELEMENT.textContent = response?.error ?? "Google connect failed.";
+    GOOGLE_CONNECT_BUTTON.disabled = false;
     return;
   }
 
@@ -79,4 +102,36 @@ function formatProductAuthStatus(productAuth) {
   }
 
   return productAuth.message ?? productAuth.displayName ?? "Signed out";
+}
+
+function formatGoogleOAuthStatus(googleOAuth) {
+  if (!googleOAuth?.status) {
+    return "Not connected.";
+  }
+
+  if (googleOAuth.status === "connected") {
+    return "Connected.";
+  }
+
+  if (googleOAuth.status === "connecting") {
+    return "Connecting...";
+  }
+
+  if (googleOAuth.status === "reconnect_required") {
+    return "Reconnect required.";
+  }
+
+  if (googleOAuth.status === "access_denied") {
+    return "Access denied.";
+  }
+
+  if (googleOAuth.status === "auth_expired") {
+    return "Product auth expired.";
+  }
+
+  if (googleOAuth.status === "dependency_error") {
+    return "Service unavailable. Retry later.";
+  }
+
+  return googleOAuth.message ?? googleOAuth.displayName ?? "Not connected.";
 }

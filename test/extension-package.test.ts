@@ -44,6 +44,7 @@ describe("extension package", () => {
       expect(config.supportingWebOrigin).toBe("https://dev.melsifen-ai-assist.com");
       expect(config.cognitoAuthBaseUrl).toMatch(/^https:\/\/ai-assist-dev-us-west-2-product-auth\.auth\.us-west-2\.amazoncognito\.com$/);
       expect(config.cognitoClientId).toBe("replace-with-dev-public-app-client-id");
+      expect(config.googleOAuthRedirectTarget).toBe(config.cognitoRedirectUri);
       expect(config.cognitoResponseType).toBe("token");
       expect(serializedConfig).not.toMatch(/execute-api/i);
       expect(serializedConfig).not.toMatch(/bearer|id_token|access_token|refresh_token|secret|api[_-]?key|sk-/i);
@@ -60,6 +61,7 @@ describe("extension package", () => {
     for (const panelScript of [chromeSidepanelScript, firefoxSidebarScript]) {
       expect(panelScript).toContain("documentId");
       expect(panelScript).toContain("productAuthStatus");
+      expect(panelScript).toContain("googleOAuthStatus");
       expect(panelScript).not.toContain("idToken");
       expect(panelScript).not.toContain("accessToken");
       expect(panelScript).not.toMatch(/innerText|document\.body|querySelectorAll/i);
@@ -76,6 +78,23 @@ describe("extension package", () => {
     expect(firefoxSidebarScript).not.toMatch(/id_token|access_token|Authorization|Bearer/);
     expect(chromeSidepanelScript).toContain("appUrl.searchParams.set(\"productAuthStatus\"");
     expect(firefoxSidebarScript).toContain("appUrl.searchParams.set(\"productAuthStatus\"");
+    expect(chromeSidepanelScript).toContain("appUrl.searchParams.set(\"googleOAuthStatus\"");
+    expect(firefoxSidebarScript).toContain("appUrl.searchParams.set(\"googleOAuthStatus\"");
+  });
+
+  it("starts Google OAuth from the extension background with bearer headers and safe redirect targets", () => {
+    for (const backgroundScript of [chromeServiceWorkerScript, firefoxBackgroundScript]) {
+      expect(backgroundScript).toContain("AI_ASSIST_GOOGLE_CONNECT");
+      expect(backgroundScript).toContain("AI_ASSIST_GOOGLE_OAUTH_STATUS");
+      expect(backgroundScript).toContain("GOOGLE_OAUTH_START_PATH = \"/oauth/google/start\"");
+      expect(backgroundScript).toContain("GOOGLE_OAUTH_STATUS_PATH = \"/oauth/google/status\"");
+      expect(backgroundScript).toContain("Authorization: authorization");
+      expect(backgroundScript).toContain("body: JSON.stringify({ redirectTarget: googleOAuthRedirectTarget(config) })");
+      expect(backgroundScript).toContain("googleOAuthRedirectTarget ?? config.cognitoRedirectUri");
+    }
+
+    expect(chromeSidepanelScript).not.toContain("AI_ASSIST_GET_AUTHORIZATION_HEADER");
+    expect(firefoxSidebarScript).not.toContain("AI_ASSIST_GET_AUTHORIZATION_HEADER");
   });
 
   it("keeps extension-side product auth token handling inside background boundaries", () => {

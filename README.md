@@ -179,6 +179,9 @@ the ignored local extension config with non-secret Cognito values from the
 - `cognitoRedirectUri`: the browser extension identity redirect URI registered
   on the Cognito app client callback URLs.
 - `cognitoLogoutRedirectUri`: the matching registered logout URL.
+- `googleOAuthRedirectTarget`: the same browser extension identity redirect URI
+  so the deployed Google OAuth callback can return to the extension flow after
+  `/oauth/google/start`.
 - `cognitoScopes`: `openid`, `email`, and `profile` for product identity.
 - `cognitoResponseType`: `token` for the current public-client sidebar flow.
 
@@ -214,6 +217,18 @@ keys, document text, prompts, or model output in query strings, logs, or
 committed config. Backend product-route calls must request the bearer value from
 the extension background boundary and send it as an `Authorization: Bearer ...`
 header. Google OAuth remains a separate step after product login.
+
+After product login reaches `signed_in`, use the sidebar/side-panel
+`Connect Google` action. The extension background reads the Cognito ID token
+from its storage boundary, calls `POST /oauth/google/start` with
+`Authorization: Bearer ...`, launches the returned Google authorization URL
+through the browser identity flow, then refreshes `GET /oauth/google/status`.
+The sidebar shows not-connected, connecting, connected, reconnect-required,
+access-denied, auth-expired, and dependency-error states. The embedded app URL
+receives only `productAuthStatus` and `googleOAuthStatus`; ID tokens, access
+tokens, Google OAuth tokens, authorization codes, provider keys, document
+content, prompts, and model output must not appear in iframe URLs, logs, or
+tracked config.
 
 For deployed dogfood builds, pass matching Vite runtime env values without
 committing the endpoint:
