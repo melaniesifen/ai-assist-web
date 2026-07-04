@@ -30,6 +30,8 @@ safe-error behavior in pure TypeScript helpers with unit tests.
 - `src/extension-surface.ts`: Google Docs browser-extension MVP surface
   contract for page support, document ID detection, backend ownership, and safe
   user-facing states.
+- `extension/`: Chrome MV3 trusted-owner dogfood side-panel shell, content
+  script, service worker, and deployed dev runtime endpoint config.
 - `src/assistant-demo.ts`: local side-panel demo helpers for content-script
   bridge metadata, mocked chat state, PR-style review cards, approve/reject,
   approve-all, backend-shaped apply requests, and mocked apply results.
@@ -112,6 +114,81 @@ into the browser bundle. Tests import and validate the real Google Docs vertical
   supported Google Docs document surface.
 - `MISSING_DOCUMENT_ID`: Google Docs page shape is recognized, but no usable
   document ID is available.
+
+## Trusted-Owner Dogfood Extensions
+
+M10 dogfooding uses a browser side-panel/sidebar package as the primary product
+surface. Chrome uses the MV3 side-panel package in `extension/`. Firefox uses
+the WebExtension sidebar package in `extension/firefox/`. Both packages are
+intentionally small:
+
+1. `content-script.js` runs only on `https://docs.google.com/document/*` and
+   extracts the current Google Docs document ID from the URL path.
+2. Chrome `service-worker.js` or Firefox `background.js` stores non-secret
+   deployed dev endpoint config and relays the active document context to the
+   side-panel/sidebar UI.
+3. Chrome `sidepanel.html`/`sidepanel.js` or Firefox
+   `sidebar.html`/`sidebar.js` shows the detected document ID and embeds the
+   built Vite app from `dist/index.html`.
+
+Build the Firefox dogfood extension package from this repo:
+
+```sh
+npm run build:extension:firefox:dev
+```
+
+Then open `about:debugging#/runtime/this-firefox`, choose "Load Temporary
+Add-on", and select
+`/Users/mel/ai-assist-platform/ai-assist-web/extension/firefox/manifest.json`.
+Open a Google Doc, click the AI Assist toolbar icon, and Firefox will open the
+AI Assist sidebar. The build script copies the generated Vite app into ignored
+`extension/firefox/dist/` because Firefox serves sidebar files only from the
+temporary add-on directory.
+
+Build the Chrome dogfood extension package from this repo:
+
+```sh
+npm run build:extension:chrome:dev
+```
+
+Then load `/Users/mel/ai-assist-platform/ai-assist-web/extension` as an
+unpacked extension in Chrome with Developer Mode enabled. The build script
+copies the generated Vite app into ignored `extension/dist/` because Chrome
+serves extension files only from the unpacked extension directory.
+
+`npm run build:extension:dev` remains an alias for the Chrome build.
+
+The committed extension configs are examples only. Before dogfooding against a
+deployed environment, create local ignored runtime config files from the examples
+and replace the placeholder HTTP API origin with the deployed dev value:
+
+```sh
+cp extension/config.example.json extension/config.dev.json
+cp extension/firefox/config.example.json extension/firefox/config.dev.json
+```
+
+For deployed dogfood builds, pass matching Vite runtime env values without
+committing the endpoint:
+
+```sh
+VITE_API_BASE_URL=<dev-http-api-base-url> \
+VITE_SSE_BASE_URL=https://sse.dev.melsifen-ai-assist.com \
+VITE_DEMO_SESSION_ID=session-dogfood-dev \
+npm run build:extension:firefox:dev
+```
+
+Endpoint locations are public metadata, not credentials, but the concrete API
+Gateway URL should stay in ignored local config or shell history rather than
+tracked files. Do not add bearer tokens, OAuth tokens, provider keys, bootstrap
+secrets, cookies, or raw document content to extension config, extension
+storage, logs, query strings, or committed files. The side panel/sidebar passes
+only document ID and endpoint metadata to the embedded app shell; backend
+services own product auth, Google OAuth, model providers, Google Docs read/write
+APIs, proposed-action persistence, and apply-action.
+
+`https://dev.melsifen-ai-assist.com` is supporting infrastructure for OAuth
+redirects, hosted assets, diagnostics, or fallback setup. It is not the primary
+M10 dogfood UI while the owner is working in Google Docs.
 
 ## First-Run Setup Harness
 

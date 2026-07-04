@@ -123,6 +123,15 @@ Relevant design sources: frontend, provider-key, command, SSE, context, proposed
 - [x] M9-T7: Verify browser/client logs and diagnostics stay metadata-only.
 - [x] M9-T9.12: Document that deployed dogfood `VITE_API_BASE_URL` and `VITE_SSE_BASE_URL` should match the opt-in live smoke `AI_ASSIST_API_BASE_URL` and `AI_ASSIST_SSE_BASE_URL` so web and smoke target the same deployed surfaces.
 
+## M10 Product Surface And Deployed Config Progress
+
+- [x] M10-T2: Confirm the primary owner dogfood surface is the Google Docs side-panel/browser-extension shell, not the standalone hosted web origin.
+- [x] M10-T2: Add an unpacked Chrome MV3 side-panel shell under `extension/` with Google Docs document ID detection and handoff to the side-panel UI.
+- [x] M10-T2: Configure the dogfood extension and Vite build path for deployed dev HTTP and SSE endpoints without browser-exposed secrets.
+- [x] M10-T2: Document the extension install/run path and the supporting role of `https://dev.melsifen-ai-assist.com`.
+- [x] M10-T2: Add deterministic tests that validate the extension manifest, deployed dev endpoint config, document ID handoff, and no Google Docs content scraping in the content script.
+- [x] M10-T2 follow-up: Add a Firefox WebExtension sidebar package and dev build script so owner dogfooding does not require Chrome.
+
 ## E2E-Owned UI Validation
 
 - [ ] E2E-001: Validate first-run onboarding UI for login, Google connection, provider-key entry, provider validation result, and Google resource-session start.

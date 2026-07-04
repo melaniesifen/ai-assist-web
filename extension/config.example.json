@@ -1,0 +1,6 @@
+{
+  "apiBaseUrl": "https://api.dev.example.test",
+  "sseBaseUrl": "https://sse.dev.melsifen-ai-assist.com",
+  "supportingWebOrigin": "https://dev.melsifen-ai-assist.com",
+  "defaultSessionId": "session-dogfood-dev"
+}

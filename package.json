@@ -6,6 +6,9 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "build:extension:chrome:dev": "npm run build && mkdir -p extension/dist/assets && cp dist/index.html extension/dist/index.html && cp -R dist/assets/. extension/dist/assets/",
+    "build:extension:firefox:dev": "npm run build && mkdir -p extension/firefox/dist/assets && cp dist/index.html extension/firefox/dist/index.html && cp -R dist/assets/. extension/firefox/dist/assets/",
+    "build:extension:dev": "npm run build:extension:chrome:dev",
     "preview": "vite preview",
     "test": "vitest run",
     "coverage": "vitest run --coverage",

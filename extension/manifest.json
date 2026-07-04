@@ -1,0 +1,31 @@
+{
+  "manifest_version": 3,
+  "name": "AI Assist Dogfood",
+  "version": "0.1.0",
+  "description": "Trusted-owner dogfood side panel for Google Docs.",
+  "action": {
+    "default_title": "Open AI Assist"
+  },
+  "background": {
+    "service_worker": "service-worker.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://docs.google.com/document/*"],
+      "js": ["content-script.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "host_permissions": ["https://docs.google.com/document/*"],
+  "permissions": ["activeTab", "sidePanel", "storage", "tabs"],
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["dist/*", "dist/assets/*"],
+      "matches": ["https://docs.google.com/*"]
+    }
+  ]
+}

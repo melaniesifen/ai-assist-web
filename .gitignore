@@ -1,5 +1,10 @@
 prompts/
 feedback/
+logs/
+extension/config.dev.json
+extension/firefox/config.dev.json
+extension/dist/
+extension/firefox/dist/
 node_modules/
 coverage/
 .coverage/
