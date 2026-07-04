@@ -81,6 +81,12 @@ async function runGoogleConnectAction() {
     return;
   }
 
+  if (response.googleOAuth?.status && response.googleOAuth.status !== "connected") {
+    GOOGLE_OAUTH_STATUS_ELEMENT.textContent = formatGoogleOAuthStatus(response.googleOAuth);
+    GOOGLE_CONNECT_BUTTON.disabled = false;
+    return;
+  }
+
   await loadRuntimeContext();
 }
 

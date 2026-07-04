@@ -213,9 +213,9 @@ async function startGoogleOAuthConnect() {
       url: body.authorizationUrl,
       interactive: true
     });
-  } catch {
-    googleOAuthState = accessDeniedGoogleState();
-    return googleOAuthState;
+  } catch (error) {
+    googleOAuthState = accessDeniedGoogleState(`Google authorization window failed: ${safeErrorMessage(error)}`);
+    throw new Error(googleOAuthState.message);
   }
   return readGoogleOAuthStatus(config);
 }
@@ -378,11 +378,11 @@ function reconnectRequiredGoogleState() {
   };
 }
 
-function accessDeniedGoogleState() {
+function accessDeniedGoogleState(message = "Google authorization was denied or this user is not allowed.") {
   return {
     status: "access_denied",
     displayName: "Google access denied",
-    message: "Google authorization was denied or this user is not allowed.",
+    message,
     connected: false
   };
 }
