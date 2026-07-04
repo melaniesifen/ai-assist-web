@@ -30,6 +30,44 @@ export type SessionStreamClientState = {
   safeLogEvent: SessionStreamLogEvent;
 };
 
+export type SessionStreamRouteResult = {
+  streamUrl: string;
+  requestHeaders: Record<string, string>;
+  ok: boolean;
+  status: number;
+  contentType: string | null;
+  state: SessionStreamClientState;
+  refreshGuidance: string | null;
+};
+
+export type SessionStreamRouteFetchInit = {
+  method: "GET";
+  headers: Record<string, string>;
+  signal?: AbortSignal;
+};
+
+export type SessionStreamRouteFetch = (
+  streamUrl: string,
+  init: SessionStreamRouteFetchInit
+) => Promise<{
+  ok: boolean;
+  status: number;
+  headers: {
+    get(name: string): string | null;
+  };
+  body?: ReadableStream<Uint8Array> | null;
+  text(): Promise<string>;
+}>;
+
+export type FetchSessionStreamRouteOptions = {
+  streamUrl: string;
+  lastEventId?: string | null;
+  initialState?: SessionStreamClientState;
+  fetcher?: SessionStreamRouteFetch;
+  onState?: (state: SessionStreamClientState) => void;
+  signal?: AbortSignal;
+};
+
 export type SessionStreamLogEvent = {
   event: typeof SESSION_STREAM_LOG_EVENT;
   sessionId: string | null;
@@ -74,6 +112,8 @@ const DEMO_RESOURCE_REF = Object.freeze({
   displayName: "Stream demo document",
   externalUrl: "https://docs.google.com/document/d/gdoc_stream_demo/edit"
 });
+const REFRESH_DURABLE_STATE_GUIDANCE =
+  "Refresh durable session state over HTTP before applying changes.";
 
 export function createInitialSessionStreamClientState(): SessionStreamClientState {
   return {
@@ -92,14 +132,7 @@ export function reduceSseFrame(
   const current = state ?? createInitialSessionStreamClientState();
   const parsedFrame = typeof frame === "string" ? parseSseFrame(frame) : frame;
   if (!parsedFrame.data) {
-    const session = reduceSessionEvent(current.session, null);
-    return {
-      ...current,
-      session,
-      malformedFrameCount: current.malformedFrameCount + 1,
-      reconnectRequired: true,
-      safeLogEvent: createSessionStreamLogEvent(session, null)
-    };
+    return current;
   }
 
   const event = parseSessionEventData(parsedFrame.data);
@@ -107,10 +140,40 @@ export function reduceSseFrame(
   const malformed = event === null;
   return {
     session,
-    lastEventId: parsedFrame.id ?? event?.eventId ?? current.lastEventId,
+    lastEventId: malformed ? current.lastEventId : (parsedFrame.id ?? event?.eventId ?? current.lastEventId),
     reconnectRequired: malformed || session.streamWarnings.some((warning) => warning.kind === "SEQUENCE_GAP"),
     malformedFrameCount: current.malformedFrameCount + (malformed ? 1 : 0),
     safeLogEvent: createSessionStreamLogEvent(session, event)
+  };
+}
+
+export async function fetchSessionStreamRoute({
+  streamUrl,
+  lastEventId = null,
+  initialState = createInitialSessionStreamClientState(),
+  fetcher = defaultSessionStreamRouteFetch,
+  onState,
+  signal
+}: FetchSessionStreamRouteOptions): Promise<SessionStreamRouteResult> {
+  const requestHeaders = createLastEventIdHeaders(lastEventId);
+  const response = await fetcher(streamUrl, {
+    method: "GET",
+    headers: requestHeaders,
+    signal
+  });
+  const contentType = response.headers.get("content-type");
+  const state = response.body
+    ? await reduceReadableSseStream(response.body, initialState, onState)
+    : reduceSseFrames(await response.text(), initialState, onState);
+
+  return {
+    streamUrl,
+    requestHeaders,
+    ok: response.ok,
+    status: response.status,
+    contentType,
+    state,
+    refreshGuidance: state.reconnectRequired ? REFRESH_DURABLE_STATE_GUIDANCE : null
   };
 }
 
@@ -137,6 +200,10 @@ export function parseSseFrame(frame: string): SseFrame {
 
 export function createLastEventIdHeaders(lastEventId: string | null): Record<string, string> {
   return lastEventId ? { [LAST_EVENT_ID_HEADER]: lastEventId } : {};
+}
+
+export function getSessionStreamRefreshGuidance(state: SessionStreamClientState): string | null {
+  return state.reconnectRequired ? REFRESH_DURABLE_STATE_GUIDANCE : null;
 }
 
 export function createSessionStreamLogEvent(
@@ -245,6 +312,86 @@ function parseSessionEventData(data: string): SessionEventEnvelope | null {
     return null;
   }
 }
+
+function splitSseFrames(body: string): string[] {
+  return body
+    .split(/\r?\n\r?\n/)
+    .map((frame) => frame.trim())
+    .filter((frame) => frame.length > 0);
+}
+
+async function reduceReadableSseStream(
+  body: ReadableStream<Uint8Array>,
+  initialState: SessionStreamClientState,
+  onState: ((state: SessionStreamClientState) => void) | undefined
+): Promise<SessionStreamClientState> {
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let current = initialState;
+
+  try {
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) {
+        break;
+      }
+      buffer += decoder.decode(value, { stream: true });
+      const split = splitCompleteSseFrames(buffer);
+      buffer = split.remaining;
+      current = split.frames.reduce((state, frame) => reduceFrameAndNotify(state, frame, onState), current);
+    }
+
+    buffer += decoder.decode();
+    if (buffer.trim().length > 0) {
+      current = reduceFrameAndNotify(current, buffer, onState);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+
+  return current;
+}
+
+function reduceSseFrames(
+  body: string,
+  initialState: SessionStreamClientState,
+  onState: ((state: SessionStreamClientState) => void) | undefined
+): SessionStreamClientState {
+  return splitSseFrames(body).reduce((state, frame) => reduceFrameAndNotify(state, frame, onState), initialState);
+}
+
+function reduceFrameAndNotify(
+  state: SessionStreamClientState,
+  frame: string,
+  onState: ((state: SessionStreamClientState) => void) | undefined
+): SessionStreamClientState {
+  const next = reduceSseFrame(state, frame);
+  if (next !== state) {
+    onState?.(next);
+  }
+  return next;
+}
+
+function splitCompleteSseFrames(buffer: string): { frames: string[]; remaining: string } {
+  const separator = /\r?\n\r?\n/;
+  const frames: string[] = [];
+  let remaining = buffer;
+
+  for (;;) {
+    const match = separator.exec(remaining);
+    if (!match) {
+      return { frames, remaining };
+    }
+    frames.push(remaining.slice(0, match.index));
+    remaining = remaining.slice(match.index + match[0].length);
+  }
+}
+
+const defaultSessionStreamRouteFetch: SessionStreamRouteFetch = async (streamUrl, init) => {
+  const response = await fetch(streamUrl, init);
+  return response;
+};
 
 function toSseFrame(event: SessionEventEnvelope): string {
   return [`id: ${event.eventId}`, "event: session-event", `data: ${JSON.stringify(event)}`].join("\n");

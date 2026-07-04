@@ -131,6 +131,7 @@ Relevant design sources: frontend, provider-key, command, SSE, context, proposed
 - [x] M10-T2: Document the extension install/run path and the supporting role of `https://dev.melsifen-ai-assist.com`.
 - [x] M10-T2: Add deterministic tests that validate the extension manifest, deployed dev endpoint config, document ID handoff, and no Google Docs content scraping in the content script.
 - [x] M10-T2 follow-up: Add a Firefox WebExtension sidebar package and dev build script so owner dogfooding does not require Chrome.
+- [x] M10-T5 web slice: Add deterministic deployed-shaped SSE route coverage for `progress`, `assistant.delta`, `assistant.final`, `action.proposed`, `action.status_changed`, `error`, `Last-Event-ID`, duplicate suppression across reconnect state, malformed-event handling, and durable refresh guidance.
 
 ## E2E-Owned UI Validation
 

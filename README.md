@@ -272,6 +272,14 @@ matching the M9 long-lived browser `EventSource` route shape. After reconnect,
 duplicate event, malformed event, or sequence gap, the UI directs the user to
 refresh durable session state over HTTP before applying changes.
 
+`src/session-stream.ts` also exposes a fetch-based deployed-route SSE helper for
+tests and future browser wiring that need explicit reconnect headers. It sends
+`Last-Event-ID` when a reconnect cursor exists, incrementally parses
+deployed-shaped `text/event-stream` frames containing full `SessionEvent`
+envelopes, suppresses duplicate event IDs across reconnect state, and preserves
+the last successfully applied event ID when a malformed frame forces
+durable-state refresh guidance.
+
 For deployed dogfood checks, keep `VITE_API_BASE_URL` aligned with
 `AI_ASSIST_API_BASE_URL` from `ai-assist-integration-tests/scripts/run-live-smoke`
 and keep `VITE_SSE_BASE_URL` aligned with `AI_ASSIST_SSE_BASE_URL`. This lets

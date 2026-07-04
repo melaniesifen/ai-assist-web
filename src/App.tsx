@@ -45,6 +45,7 @@ import {
   createInitialSessionStreamClientState,
   createLastEventIdHeaders,
   createSessionStreamDemoFrames,
+  getSessionStreamRefreshGuidance,
   reduceSseFrame,
   safeSessionStreamLogExcludesForbiddenContent
 } from "./session-stream";
@@ -92,6 +93,7 @@ export function App(): ReactElement {
   const selectedContextMode = contextModes.find((mode) => mode.mode === "SELECTION");
   const activeResourceMode = contextModes.find((mode) => mode.mode === "ACTIVE_RESOURCE");
   const lastEventHeaders = createLastEventIdHeaders(sessionStreamState.lastEventId);
+  const streamRefreshGuidance = getSessionStreamRefreshGuidance(sessionStreamState);
   const streamedProposedActions = Object.values(sessionStreamState.session.proposedActions);
   const latestCommand = reviewCards.reduce<ReviewCardViewModel["lastCommand"]>(
     (command, card) => card.lastCommand ?? command,
@@ -237,6 +239,10 @@ export function App(): ReactElement {
                 <div>
                   <dt>Last-Event-ID</dt>
                   <dd>{lastEventHeaders["Last-Event-ID"] ?? "None"}</dd>
+                </div>
+                <div>
+                  <dt>Refresh guidance</dt>
+                  <dd>{streamRefreshGuidance ?? "Not needed"}</dd>
                 </div>
               </dl>
             </article>
