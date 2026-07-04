@@ -121,6 +121,7 @@ Relevant design sources: frontend, provider-key, command, SSE, context, proposed
 - [x] M9-T7: Verify loading, retry, denied, quota, provider unavailable, stale document, uncertain mutation, and expired-session states.
 - [x] M9-T7: Verify responsive layout and accessibility basics through Firefox Playwright and Playwright MCP snapshots.
 - [x] M9-T7: Verify browser/client logs and diagnostics stay metadata-only.
+- [x] M9-T9.12: Document that deployed dogfood `VITE_API_BASE_URL` and `VITE_SSE_BASE_URL` should match the opt-in live smoke `AI_ASSIST_API_BASE_URL` and `AI_ASSIST_SSE_BASE_URL` so web and smoke target the same deployed surfaces.
 
 ## E2E-Owned UI Validation
 

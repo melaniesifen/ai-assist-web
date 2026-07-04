@@ -195,6 +195,12 @@ matching the M9 long-lived browser `EventSource` route shape. After reconnect,
 duplicate event, malformed event, or sequence gap, the UI directs the user to
 refresh durable session state over HTTP before applying changes.
 
+For deployed dogfood checks, keep `VITE_API_BASE_URL` aligned with
+`AI_ASSIST_API_BASE_URL` from `ai-assist-integration-tests/scripts/run-live-smoke`
+and keep `VITE_SSE_BASE_URL` aligned with `AI_ASSIST_SSE_BASE_URL`. This lets
+the browser shell and opt-in smoke target the same HTTP and SSE surfaces while
+unit tests stay fake-backed by default.
+
 ## Task Breakdown
 
 Implementation tasks are tracked in [TASKS.md](TASKS.md). Update the checkboxes there in the same change that implements or verifies a task.
