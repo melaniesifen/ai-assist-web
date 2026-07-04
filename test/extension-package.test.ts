@@ -15,7 +15,10 @@ describe("extension package", () => {
     expect(chromeManifest.manifest_version).toBe(3);
     expect(chromeManifest.side_panel.default_path).toBe("sidepanel.html");
     expect(chromeManifest.permissions).toEqual(expect.arrayContaining(["identity", "sidePanel", "storage", "tabs"]));
-    expect(chromeManifest.host_permissions).toEqual(["https://docs.google.com/document/*"]);
+    expect(chromeManifest.host_permissions).toEqual([
+      "https://docs.google.com/document/*",
+      "https://*.execute-api.us-west-2.amazonaws.com/*"
+    ]);
     expect(chromeManifest.content_scripts[0]).toMatchObject({
       matches: ["https://docs.google.com/document/*"],
       js: ["content-script.js"]
@@ -27,7 +30,15 @@ describe("extension package", () => {
     expect(firefoxManifest.sidebar_action.default_panel).toBe("sidebar.html");
     expect(firefoxManifest.browser_action.default_title).toBe("Open AI Assist");
     expect(firefoxManifest.browser_specific_settings.gecko.id).toBe("ai-assist-dogfood@melsifen-ai-assist.com");
-    expect(firefoxManifest.permissions).toEqual(expect.arrayContaining(["identity", "storage", "tabs", "https://docs.google.com/document/*"]));
+    expect(firefoxManifest.permissions).toEqual(
+      expect.arrayContaining([
+        "identity",
+        "storage",
+        "tabs",
+        "https://docs.google.com/document/*",
+        "https://*.execute-api.us-west-2.amazonaws.com/*"
+      ])
+    );
     expect(firefoxManifest.content_scripts[0]).toMatchObject({
       matches: ["https://docs.google.com/document/*"],
       js: ["content-script.js"]

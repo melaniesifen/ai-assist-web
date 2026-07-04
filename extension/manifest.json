@@ -17,7 +17,7 @@
       "run_at": "document_idle"
     }
   ],
-  "host_permissions": ["https://docs.google.com/document/*"],
+  "host_permissions": ["https://docs.google.com/document/*", "https://*.execute-api.us-west-2.amazonaws.com/*"],
   "permissions": ["activeTab", "identity", "sidePanel", "storage", "tabs"],
   "side_panel": {
     "default_path": "sidepanel.html"
