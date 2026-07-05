@@ -30,6 +30,9 @@ safe-error behavior in pure TypeScript helpers with unit tests.
 - `src/extension-surface.ts`: Google Docs browser-extension MVP surface
   contract for page support, document ID detection, backend ownership, and safe
   user-facing states.
+- `src/dogfood-sidebar-state.ts`: M12 dogfood sidebar state contract for the
+  real assistant default surface, command readiness, stream readiness, proposed
+  actions, apply gating, dev harness disposition, and metadata-only state logs.
 - `extension/`: Chrome MV3 trusted-owner dogfood side-panel shell, content
   script, service worker, and deployed dev runtime endpoint config.
 - `src/assistant-demo.ts`: local side-panel demo helpers for content-script
@@ -252,6 +255,46 @@ APIs, proposed-action persistence, and apply-action.
 `https://dev.melsifen-ai-assist.com` is supporting infrastructure for OAuth
 redirects, hosted assets, diagnostics, or fallback setup. It is not the primary
 M10 dogfood UI while the owner is working in Google Docs.
+
+## M12 Dogfood Sidebar State Contract
+
+M12 makes the real assistant the default sidebar surface. The product UI must
+derive command readiness from these state inputs before enabling prompt
+submission:
+
+1. Product auth is `signed_in`.
+2. Google OAuth is `connected`.
+3. The active page is a supported Google Docs document with a detected document
+   ID.
+4. Backend context readiness is `ready`; missing consent, permission denied, or
+   backend dependency failures block submission with specific messages.
+5. Provider readiness is `ready`; missing, unavailable, rate-limited, or error
+   states block submission.
+6. No command is already submitting and the previous command state is not a
+   blocking failure.
+
+`src/dogfood-sidebar-state.ts` is the executable contract for this state model.
+It intentionally keeps the sidebar default as `assistant`, not a harness. Its
+safe log event records only metadata such as status enums, blocker codes, and
+whether an active document ID exists. It does not log document IDs, raw prompts,
+document text, selected text, model output, OAuth tokens, bearer tokens,
+provider keys, screenshots, OCR text, accessibility trees, or action payloads.
+
+Streaming and apply are separate readiness gates. SSE reconnect gaps require an
+HTTP durable-state refresh before apply. Proposed actions can be reviewed only
+when backend state or explicitly labeled deterministic tests provide them.
+Apply stays disabled unless proposed actions are ready, apply state is ready,
+stream state does not require refresh, and controlled-document write approval is
+present.
+
+Existing deterministic panels remain useful for development coverage, but they
+must not be the dogfood default:
+
+- `setup-harness`, `context-readiness-harness`, `real-flow-harness`, and
+  `session-stream-harness`: keep behind an explicit dev affordance.
+- Mock chat/review demo state from `assistant-demo.ts` and the current
+  harness-first `App.tsx` path: remove from dogfood builds or keep only in
+  explicitly labeled deterministic tests.
 
 ## First-Run Setup Harness
 

@@ -161,6 +161,34 @@ Relevant design sources: frontend, provider-key, command, SSE, context, proposed
   outputs, and complete owner-approved live Google OAuth proof before read
   smoke.
 
+## M12 Interactive Sidebar UX Progress
+
+- [x] M12-T1.1: Define the real dogfood sidebar state contract so the assistant,
+  not the milestone harness, is the default product surface.
+- [x] M12-T1.2: Add executable command/apply readiness derivation for product
+  auth, Google OAuth, active document, context, provider, command, stream,
+  proposed-action, and apply states.
+- [x] M12-T1.3: Document that OAuth-complete does not imply assistant readiness;
+  command submission remains blocked until context, provider, stream, action,
+  and apply gates are satisfied as applicable.
+- [x] M12-T1.4: Identify existing setup, context-readiness, real-flow, and
+  session-stream harness panels as dev-only affordances, and identify mocked
+  chat/review demo state as excluded from dogfood builds unless explicitly
+  labeled in deterministic tests.
+- [ ] M12-T2.1: Make the real assistant surface the sidebar default in
+  `App.tsx` and the extension-embedded build.
+- [ ] M12-T2.2: Move diagnostic/harness panels behind an explicit dev
+  affordance or remove them from dogfood builds.
+- [ ] M12-T2.3: Render compact product auth, Google, active document, provider,
+  and command readiness controls from the M12 state contract.
+- [ ] M12-T3.1: Wire prompt input to backend command/context route shapes using
+  extension-provided product auth.
+- [ ] M12-T4.1: Wire SSE or durable refresh state into the sidebar message list.
+- [ ] M12-T4.3: Render backend proposed actions as review cards with
+  approve/reject/apply controls tied to backend action routes.
+- [ ] M12-T5.1: Run frontend tests and extension builds for the implemented M12
+  UI slice.
+
 ## E2E-Owned UI Validation
 
 - [ ] E2E-001: Validate first-run onboarding UI for login, Google connection, provider-key entry, provider validation result, and Google resource-session start.
