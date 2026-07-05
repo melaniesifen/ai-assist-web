@@ -937,15 +937,25 @@ export function DogfoodAssistantSurface({
             setStreamRefreshError(formatSessionStreamHttpError(response.status, response.contentType));
           }
         },
-        onState: setDogfoodStreamState,
+        onState: (nextState) => {
+          if (streamAbortController.current === abortController) {
+            setDogfoodStreamState(nextState);
+          }
+        },
         signal: abortController.signal
       });
+      if (streamAbortController.current !== abortController) {
+        return;
+      }
       setDogfoodStreamState(result.state);
       if (!result.ok) {
         setStreamRefreshError(formatSessionStreamHttpError(result.status, result.contentType));
         setStreamOpen(false);
       }
     } catch (error) {
+      if (streamAbortController.current !== abortController) {
+        return;
+      }
       if (!isAbortError(error)) {
         setStreamRefreshError(formatSessionStreamTransportError(error));
       }
@@ -953,11 +963,11 @@ export function DogfoodAssistantSurface({
     } finally {
       if (streamAbortController.current === abortController) {
         streamAbortController.current = null;
-      }
-      if (manual) {
-        setStreamRefreshing(false);
-      } else {
-        setStreamConnecting(false);
+        if (manual) {
+          setStreamRefreshing(false);
+        } else {
+          setStreamConnecting(false);
+        }
       }
     }
   }
