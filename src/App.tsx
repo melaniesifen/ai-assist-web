@@ -56,6 +56,14 @@ import {
   type RealFlowClientViewModel
 } from "./real-flow-client";
 import {
+  createExtensionDogfoodCommandAuthProvider,
+  safeDogfoodCommandLogExcludesForbiddenContent,
+  submitDogfoodCommand,
+  type DogfoodCommandKind,
+  type DogfoodCommandResult
+} from "./dogfood-command-client";
+import { type ExtensionRuntimeAuthBridge } from "./product-auth";
+import {
   createDogfoodSidebarState,
   safeDogfoodSidebarLogExcludesForbiddenContent,
   type DogfoodSidebarBlocker,
@@ -72,7 +80,10 @@ const DEFAULT_COMMAND_STATUS: DogfoodSidebarContractInput["command"] = "idle";
 const DEFAULT_STREAM_STATUS: DogfoodSidebarContractInput["stream"] = "disconnected";
 const DEFAULT_PROPOSED_ACTIONS_STATUS: DogfoodSidebarContractInput["proposedActions"] = "none";
 const DEFAULT_APPLY_STATUS: DogfoodSidebarContractInput["apply"] = "blocked";
-const QUICK_COMMANDS = ["Summarize this doc", "Suggest edits"] as const;
+const QUICK_COMMANDS = [
+  { kind: "summarize", label: "Summarize this doc", prompt: "Summarize this Google Doc." },
+  { kind: "suggest_edits", label: "Suggest edits", prompt: "Suggest edits for this Google Doc." }
+] as const;
 
 export function App(): ReactElement {
   const extensionSurface = useMemo(() => describeGoogleDocsExtensionSurface({ url: DEMO_DOCUMENT_URL }), []);
@@ -669,12 +680,48 @@ export function DogfoodAssistantSurface({
   input: DogfoodSidebarContractInput;
   state: DogfoodSidebarState;
 }): ReactElement {
+  const [commandPrompt, setCommandPrompt] = useState("");
+  const [commandKind, setCommandKind] = useState<DogfoodCommandKind>("custom");
+  const [commandResult, setCommandResult] = useState<DogfoodCommandResult | null>(null);
+  const [submitting, setSubmitting] = useState(false);
   const firstBlockingDependency = state.blockers.find((blocker) =>
     ["auth", "google", "document", "context", "provider", "command"].includes(blocker.area)
   );
+  const canSubmit = state.canSubmitCommand && !submitting;
   const commandPlaceholder = state.canSubmitCommand
     ? "Ask for a summary or edit suggestions"
     : firstBlockingDependency?.message ?? "Refresh readiness before submitting";
+
+  async function submitCommand(event: FormEvent<HTMLFormElement>): Promise<void> {
+    event.preventDefault();
+    setSubmitting(true);
+    setCommandResult(null);
+
+    const authRuntime = getExtensionRuntimeAuthBridge();
+    try {
+      const result = await submitDogfoodCommand(
+        {
+          prompt: commandPrompt,
+          commandKind,
+          httpBaseUrl: getRuntimeEnvValue("VITE_API_BASE_URL", "http://localhost:8787"),
+          sessionId: getRuntimeEnvValue("VITE_DEMO_SESSION_ID", "session_dogfood_sidebar"),
+          activeDocumentId: state.activeDocumentId,
+          sidebarState: state,
+          commandPathTemplate: getRuntimeEnvValue("VITE_COMMAND_CREATE_PATH", "/resource-sessions/{sessionId}/commands")
+        },
+        {
+          authProvider: authRuntime
+            ? createExtensionDogfoodCommandAuthProvider(authRuntime)
+            : async () => {
+                throw new Error("Extension product auth runtime is required.");
+              }
+        }
+      );
+      setCommandResult(result);
+    } finally {
+      setSubmitting(false);
+    }
+  }
 
   return (
     <section className="dogfood-assistant" aria-label="AI Assist sidebar">
@@ -736,24 +783,37 @@ export function DogfoodAssistantSurface({
       <section className="assistant-command" aria-label="Assistant command">
         <div className="quick-commands" aria-label="Common commands">
           {QUICK_COMMANDS.map((command) => (
-            <button disabled={!state.canSubmitCommand} key={command} type="button">
-              {command}
+            <button
+              disabled={!canSubmit}
+              key={command.kind}
+              onClick={() => {
+                setCommandKind(command.kind);
+                setCommandPrompt(command.prompt);
+              }}
+              type="button"
+            >
+              {command.label}
             </button>
           ))}
         </div>
-        <form className="assistant-command-form" onSubmit={preventDogfoodCommandSubmit}>
+        <form className="assistant-command-form" onSubmit={submitCommand}>
           <label className="sr-only" htmlFor="dogfood-command-input">Assistant prompt</label>
           <textarea
-            disabled={!state.canSubmitCommand}
+            disabled={!canSubmit}
             id="dogfood-command-input"
+            onChange={(event) => {
+              setCommandKind("custom");
+              setCommandPrompt(event.target.value);
+            }}
             placeholder={commandPlaceholder}
-            readOnly
             rows={4}
+            value={commandPrompt}
           />
-          <button className="primary" disabled={!state.canSubmitCommand} type="submit">
-            Send
+          <button className="primary" disabled={!canSubmit} type="submit">
+            {submitting ? "Sending" : "Send"}
           </button>
         </form>
+        {commandResult ? <DogfoodCommandResultPanel result={commandResult} /> : null}
       </section>
 
       <section className="assistant-status-grid" aria-label="Assistant status">
@@ -781,6 +841,39 @@ export function DogfoodAssistantSurface({
         </section>
       )}
     </section>
+  );
+}
+
+export function DogfoodCommandResultPanel({ result }: { result: DogfoodCommandResult }): ReactElement {
+  return (
+    <article className={`command-result ${result.status}`} aria-live="polite">
+      <header>
+        <div>
+          <span>{result.status.replace(/_/g, " ")}</span>
+          <strong>{result.title}</strong>
+        </div>
+        <span>{result.retryable ? "Retryable" : "No retry"}</span>
+      </header>
+      <p>{result.message}</p>
+      <dl className="command-result-metadata">
+        <div>
+          <dt>Route</dt>
+          <dd>{result.route}</dd>
+        </div>
+        <div>
+          <dt>Command</dt>
+          <dd>{result.commandId ?? "Pending"}</dd>
+        </div>
+        <div>
+          <dt>Error</dt>
+          <dd>{result.errorCode ?? "None"}</dd>
+        </div>
+        <div>
+          <dt>Safe log</dt>
+          <dd>{safeDogfoodCommandLogExcludesForbiddenContent(result.safeLogEvent) ? "metadata only" : "blocked"}</dd>
+        </div>
+      </dl>
+    </article>
   );
 }
 
@@ -912,6 +1005,47 @@ function getRuntimeSearch(): string {
     return "";
   }
   return window.location.search;
+}
+
+function getRuntimeEnvValue(key: string, fallback: string): string {
+  const value = import.meta.env[key];
+  return typeof value === "string" && value.trim() ? value.trim() : fallback;
+}
+
+function getExtensionRuntimeAuthBridge(): ExtensionRuntimeAuthBridge | null {
+  const runtime = getBrowserExtensionRuntime();
+  if (!runtime?.sendMessage) {
+    return null;
+  }
+  const sendMessage = runtime.sendMessage;
+  return {
+    async sendMessage(message) {
+      const response = await sendMessage(message);
+      return isExtensionAuthorizationResponse(response) ? response : { ok: false, error: "Extension auth response was not usable." };
+    }
+  };
+}
+
+function getBrowserExtensionRuntime(): { sendMessage?: (message: unknown) => Promise<unknown> | unknown } | null {
+  const globalRuntime = globalThis as {
+    chrome?: { runtime?: { sendMessage?: (message: unknown) => Promise<unknown> | unknown } };
+    browser?: { runtime?: { sendMessage?: (message: unknown) => Promise<unknown> | unknown } };
+  };
+  return globalRuntime.browser?.runtime ?? globalRuntime.chrome?.runtime ?? null;
+}
+
+function isExtensionAuthorizationResponse(
+  value: unknown
+): value is { readonly ok?: boolean; readonly authorization?: string | null; readonly error?: string } {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    return false;
+  }
+  const response = value as Record<string, unknown>;
+  return (
+    (response.ok === undefined || typeof response.ok === "boolean") &&
+    (response.authorization === undefined || response.authorization === null || typeof response.authorization === "string") &&
+    (response.error === undefined || typeof response.error === "string")
+  );
 }
 
 function normalizeProductAuthStatus(rawStatus: string | null): ProductAuthStatus {

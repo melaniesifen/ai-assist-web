@@ -1,7 +1,13 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { createDogfoodSidebarState, type DogfoodSidebarContractInput } from "../src/dogfood-sidebar-state";
-import { App, createDogfoodSidebarInputFromSearch, DogfoodAssistantSurface, preventDogfoodCommandSubmit } from "../src/App";
+import {
+  App,
+  createDogfoodSidebarInputFromSearch,
+  DogfoodAssistantSurface,
+  DogfoodCommandResultPanel,
+  preventDogfoodCommandSubmit
+} from "../src/App";
 
 const CONNECTED_INPUT: DogfoodSidebarContractInput = {
   productAuth: "signed_in",
@@ -84,5 +90,43 @@ describe("dogfood sidebar shell", () => {
 
     expect(html.match(/id="app-title"/g)).toHaveLength(1);
     expect(html).toContain("id=\"dev-harness-title\"");
+  });
+
+  it("renders command results without exposing raw prompt, bearer, or document content", () => {
+    const html = renderToStaticMarkup(
+      <DogfoodCommandResultPanel
+        result={{
+          status: "retryable_error",
+          title: "Command can be retried",
+          message: "The backend command route is unavailable from this browser session. Retry after readiness is refreshed.",
+          retryable: true,
+          route: "/resource-sessions/session_001/commands",
+          requestId: null,
+          correlationId: null,
+          commandId: "cmd_safe_001",
+          errorCode: "BACKEND_UNAVAILABLE",
+          safeLogEvent: {
+            event: "dogfood-command-submission",
+            commandKind: "custom",
+            routeTemplate: "/resource-sessions/{sessionId}/commands",
+            route: "/resource-sessions/session_001/commands",
+            hasActiveDocument: true,
+            inputLength: 32,
+            resultStatus: "retryable_error",
+            httpStatus: null,
+            requestId: null,
+            correlationId: null,
+            commandIdPresent: true,
+            errorCode: "BACKEND_UNAVAILABLE",
+            blockerCodes: []
+          }
+        }}
+      />
+    );
+
+    expect(html).toContain("Command can be retried");
+    expect(html).toContain("BACKEND_UNAVAILABLE");
+    expect(html).toContain("metadata only");
+    expect(html).not.toMatch(/private prompt|document text|doc_connected_123|Bearer|id\.jwt/i);
   });
 });

@@ -231,6 +231,65 @@ code {
   background: var(--surface-strong);
 }
 
+.command-result {
+  display: grid;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+  background: var(--surface);
+}
+
+.command-result.accepted {
+  border-color: #9bd1ab;
+  background: var(--success-bg);
+}
+
+.command-result.blocked,
+.command-result.dependency_error,
+.command-result.retryable_error,
+.command-result.failed {
+  border-color: #e5b5ad;
+  background: var(--danger-bg);
+}
+
+.command-result header,
+.command-result-metadata {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.command-result header span,
+.command-result-metadata dt {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.command-result p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.command-result-metadata {
+  margin: 0;
+}
+
+.command-result-metadata div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.command-result-metadata dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
 .assistant-status-panel {
   padding: 12px;
 }

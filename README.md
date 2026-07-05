@@ -33,6 +33,10 @@ safe-error behavior in pure TypeScript helpers with unit tests.
 - `src/dogfood-sidebar-state.ts`: M12 dogfood sidebar state contract for the
   real assistant default surface, command readiness, stream readiness, proposed
   actions, apply gating, dev harness disposition, and metadata-only state logs.
+- `src/dogfood-command-client.ts`: M12 dogfood command-submission client for
+  deployed-shaped `/resource-sessions/{sessionId}/commands` requests,
+  extension-owned product auth, active Google Docs context, response
+  normalization, and metadata-only command logs.
 - `extension/`: Chrome MV3 trusted-owner dogfood side-panel shell, content
   script, service worker, and deployed dev runtime endpoint config.
 - `src/assistant-demo.ts`: local side-panel demo helpers for content-script
@@ -286,6 +290,14 @@ when backend state or explicitly labeled deterministic tests provide them.
 Apply stays disabled unless proposed actions are ready, apply state is ready,
 stream state does not require refresh, and controlled-document write approval is
 present.
+
+`src/dogfood-command-client.ts` owns command submission for the sidebar prompt.
+It requests the bearer header from the extension/background boundary just before
+calling the backend, posts to `/resource-sessions/{sessionId}/commands`, and
+sends active Google Docs context as JSON body metadata instead of URL
+parameters. Its safe log event records route/status/request metadata and input
+length only; it does not log raw prompt text, document text, document IDs,
+model output, tokens, provider keys, or action payloads.
 
 Existing deterministic panels remain useful for development coverage, but they
 must not be the dogfood default:

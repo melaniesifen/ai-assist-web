@@ -181,8 +181,12 @@ Relevant design sources: frontend, provider-key, command, SSE, context, proposed
   affordance or remove them from dogfood builds.
 - [x] M12-T2.3: Render compact product auth, Google, active document, provider,
   and command readiness controls from the M12 state contract.
-- [ ] M12-T3.1: Wire prompt input to backend command/context route shapes using
+- [x] M12-T3.1: Wire prompt input to backend command/context route shapes using
   extension-provided product auth.
+- [x] M12-T3.2: Send active document ID/session context without raw document
+  text in browser logs.
+- [x] M12-T3.3: Render backend accepted, blocked, retryable, and dependency
+  responses with safe, actionable messages.
 - [ ] M12-T4.1: Wire SSE or durable refresh state into the sidebar message list.
 - [ ] M12-T4.3: Render backend proposed actions as review cards with
   approve/reject/apply controls tied to backend action routes.
