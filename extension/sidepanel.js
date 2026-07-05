@@ -12,7 +12,7 @@ const GOOGLE_OAUTH_POLL_ATTEMPTS = 30;
 
 PRODUCT_SIGN_IN_BUTTON.addEventListener("click", () => runProductAuthAction("AI_ASSIST_PRODUCT_SIGN_IN"));
 PRODUCT_SIGN_OUT_BUTTON.addEventListener("click", () => runProductAuthAction("AI_ASSIST_PRODUCT_SIGN_OUT"));
-GOOGLE_CONNECT_BUTTON.addEventListener("click", () => runGoogleConnectAction());
+GOOGLE_CONNECT_BUTTON.addEventListener("click", () => runGoogleConnectAction(GOOGLE_CONNECT_BUTTON.dataset.action));
 
 loadRuntimeContext();
 
@@ -36,8 +36,9 @@ function renderBridge(config, documentContext, productAuth, googleOAuth) {
   SSE_BASE_URL_ELEMENT.textContent = config.sseBaseUrl;
   PRODUCT_AUTH_STATUS_ELEMENT.textContent = formatProductAuthStatus(productAuth);
   GOOGLE_OAUTH_STATUS_ELEMENT.textContent = formatGoogleOAuthStatus(googleOAuth);
+  GOOGLE_CONNECT_BUTTON.dataset.action = googleOAuth?.status === "connected" || googleOAuth?.status === "reconnect_required" ? "reconnect" : "connect";
   GOOGLE_CONNECT_BUTTON.disabled = productAuth?.status !== "signed_in" || googleOAuth?.status === "connecting";
-  GOOGLE_CONNECT_BUTTON.textContent = googleOAuth?.status === "reconnect_required" ? "Reconnect Google" : "Connect Google";
+  GOOGLE_CONNECT_BUTTON.textContent = GOOGLE_CONNECT_BUTTON.dataset.action === "reconnect" ? "Reconnect Google" : "Connect Google";
 }
 
 function openAssistantApp(config, documentContext, activeTabUrl, productAuth, googleOAuth) {
@@ -84,10 +85,10 @@ async function runProductAuthAction(type) {
   await loadRuntimeContext();
 }
 
-async function runGoogleConnectAction() {
-  GOOGLE_OAUTH_STATUS_ELEMENT.textContent = "Opening Google authorization...";
+async function runGoogleConnectAction(action = "connect") {
+  GOOGLE_OAUTH_STATUS_ELEMENT.textContent = action === "reconnect" ? "Refreshing Google authorization..." : "Opening Google authorization...";
   GOOGLE_CONNECT_BUTTON.disabled = true;
-  const response = await chrome.runtime.sendMessage({ type: "AI_ASSIST_GOOGLE_CONNECT" });
+  const response = await chrome.runtime.sendMessage({ type: action === "reconnect" ? "AI_ASSIST_GOOGLE_RECONNECT" : "AI_ASSIST_GOOGLE_CONNECT" });
 
   if (!response?.ok) {
     GOOGLE_OAUTH_STATUS_ELEMENT.textContent = response?.error ?? "Google connect failed.";

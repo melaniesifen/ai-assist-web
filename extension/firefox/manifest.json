@@ -22,7 +22,8 @@
     "storage",
     "tabs",
     "https://docs.google.com/document/*",
-    "https://*.execute-api.us-west-2.amazonaws.com/*"
+    "https://*.execute-api.us-west-2.amazonaws.com/*",
+    "https://sse.dev.melsifen-ai-assist.com/*"
   ],
   "sidebar_action": {
     "default_title": "AI Assist",

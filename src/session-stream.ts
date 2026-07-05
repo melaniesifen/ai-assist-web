@@ -64,6 +64,7 @@ export type FetchSessionStreamRouteOptions = {
   lastEventId?: string | null;
   initialState?: SessionStreamClientState;
   fetcher?: SessionStreamRouteFetch;
+  onResponse?: (response: { ok: boolean; status: number; contentType: string | null }) => void;
   onState?: (state: SessionStreamClientState) => void;
   signal?: AbortSignal;
 };
@@ -152,6 +153,7 @@ export async function fetchSessionStreamRoute({
   lastEventId = null,
   initialState = createInitialSessionStreamClientState(),
   fetcher = defaultSessionStreamRouteFetch,
+  onResponse,
   onState,
   signal
 }: FetchSessionStreamRouteOptions): Promise<SessionStreamRouteResult> {
@@ -162,6 +164,7 @@ export async function fetchSessionStreamRoute({
     signal
   });
   const contentType = response.headers.get("content-type");
+  onResponse?.({ ok: response.ok, status: response.status, contentType });
   const state = response.body
     ? await reduceReadableSseStream(response.body, initialState, onState)
     : reduceSseFrames(await response.text(), initialState, onState);

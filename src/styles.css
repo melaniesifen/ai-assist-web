@@ -132,6 +132,14 @@ code {
   font-size: 1rem;
 }
 
+.dogfood-header-actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 8px;
+  align-items: center;
+  justify-content: flex-end;
+}
+
 .readiness-badge {
   flex: 0 0 auto;
   border: 1px solid var(--line);
@@ -1191,6 +1199,11 @@ dd {
   .blocker-row {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .dogfood-header-actions {
+    flex-wrap: wrap;
+    justify-content: flex-start;
   }
 
   .document-body {

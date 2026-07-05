@@ -8,6 +8,7 @@ import {
   DogfoodAssistantSurface,
   DogfoodSessionStatePanel,
   DogfoodCommandResultPanel,
+  getRuntimeSearchValue,
   preventDogfoodCommandSubmit
 } from "../src/App";
 
@@ -34,6 +35,8 @@ describe("dogfood sidebar shell", () => {
 
     expect(html).toContain("Chat with this doc");
     expect(html).toContain("Connected");
+    expect(html).toContain("Reconnect Google");
+    expect(html).toContain("Reconnect stream");
     expect(html).toContain("Chat");
     expect(html).toContain("Summarize this doc");
     expect(html).toContain("Ask a question about this Google Doc.");
@@ -83,6 +86,42 @@ describe("dogfood sidebar shell", () => {
     expect(state.canSubmitCommand).toBe(true);
     expect(state.activeDocumentId).toBe("doc_connected_123");
     expect(state.blockers.map((blocker) => blocker.area)).toEqual(["apply", "apply"]);
+  });
+
+  it("keeps chat blocked and exposes context preparation when OAuth is complete but consent is not ready", () => {
+    const input = createDogfoodSidebarInputFromSearch(
+      "?documentId=doc_connected_123&productAuthStatus=signed_in&googleOAuthStatus=connected&contextStatus=consent_required&providerStatus=ready&commandStatus=ready&streamStatus=open",
+      null
+    );
+    const state = createDogfoodSidebarState(input);
+    const html = renderToStaticMarkup(<DogfoodAssistantSurface input={input} state={state} />);
+
+    expect(state.canSubmitCommand).toBe(false);
+    expect(html).toContain("Document context");
+    expect(html).toContain("Allow context");
+    expect(html).toContain("CONTEXT_CONSENT_REQUIRED");
+    expect(html).toContain("Approve document context access before submitting a command.");
+  });
+
+  it("reads the context-consent route override from the extension iframe query string", () => {
+    const previousWindow = globalThis.window;
+    Object.defineProperty(globalThis, "window", {
+      configurable: true,
+      value: {
+        location: {
+          search: "?contextConsentPath=%2Fresource-sessions%2F%7BsessionId%7D%2Fcontext-consent"
+        }
+      }
+    });
+
+    try {
+      expect(getRuntimeSearchValue("VITE_CONTEXT_CONSENT_PATH")).toBe("/resource-sessions/{sessionId}/context-consent");
+    } finally {
+      Object.defineProperty(globalThis, "window", {
+        configurable: true,
+        value: previousWindow
+      });
+    }
   });
 
   it("prevents default form navigation while backend command submission is pending", () => {
@@ -170,6 +209,29 @@ describe("dogfood sidebar shell", () => {
     expect(html).toContain("metadata only");
   });
 
+  it("renders stream refresh errors with safe HTTP metadata", () => {
+    const state = createDogfoodSidebarState(CONNECTED_INPUT);
+    const html = renderToStaticMarkup(
+      <DogfoodSessionStatePanel
+        actionResult={null}
+        actionRouteStates={{}}
+        actionSubmitting={null}
+        onRefresh={async () => undefined}
+        onAction={async () => undefined}
+        proposedActions={[]}
+        sidebarState={state}
+        streamConnecting={false}
+        streamRefreshError="Session stream is unavailable from this browser session. HTTP 401."
+        streamRefreshing={false}
+        streamOpen={false}
+        streamState={createInitialSessionStreamClientState()}
+      />
+    );
+
+    expect(html).toContain("Session stream is unavailable from this browser session. HTTP 401.");
+    expect(html).not.toMatch(/Bearer|id_token|access_token|document text|private prompt/i);
+  });
+
   it("keeps apply disabled when controlled-document write approval is missing", () => {
     const input = {
       ...CONNECTED_INPUT,
@@ -197,8 +259,10 @@ describe("dogfood sidebar shell", () => {
         onAction={async () => undefined}
         proposedActions={Object.values(streamState.session.proposedActions)}
         sidebarState={state}
+        streamConnecting={false}
         streamRefreshError={null}
         streamRefreshing={false}
+        streamOpen={false}
         streamState={streamState}
       />
     );
@@ -233,8 +297,10 @@ describe("dogfood sidebar shell", () => {
         onAction={async () => undefined}
         proposedActions={Object.values(streamState.session.proposedActions)}
         sidebarState={state}
+        streamConnecting={false}
         streamRefreshError={null}
         streamRefreshing={false}
+        streamOpen={false}
         streamState={streamState}
       />
     );
@@ -269,8 +335,10 @@ describe("dogfood sidebar shell", () => {
         onAction={async () => undefined}
         proposedActions={Object.values(streamState.session.proposedActions)}
         sidebarState={state}
+        streamConnecting={false}
         streamRefreshError={null}
         streamRefreshing={false}
+        streamOpen={false}
         streamState={streamState}
       />
     );

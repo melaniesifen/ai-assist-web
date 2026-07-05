@@ -1,4 +1,4 @@
-import { type FormEvent, type ReactElement, useMemo, useState } from "react";
+import { type FormEvent, type ReactElement, useEffect, useMemo, useRef, useState } from "react";
 import { describeGoogleDocsExtensionSurface } from "./extension-surface";
 import {
   DEMO_DOCUMENT_URL,
@@ -98,6 +98,8 @@ const DEFAULT_COMMAND_STATUS: DogfoodSidebarContractInput["command"] = "idle";
 const DEFAULT_STREAM_STATUS: DogfoodSidebarContractInput["stream"] = "disconnected";
 const DEFAULT_PROPOSED_ACTIONS_STATUS: DogfoodSidebarContractInput["proposedActions"] = "none";
 const DEFAULT_APPLY_STATUS: DogfoodSidebarContractInput["apply"] = "blocked";
+const SESSION_STREAM_UNAVAILABLE_MESSAGE = "Session stream is unavailable from this browser session.";
+const SESSION_STREAM_AUTH_UNAVAILABLE_MESSAGE = "Session stream auth is unavailable from this browser session.";
 const QUICK_COMMANDS = [
   { kind: "summarize", label: "Summarize this doc", prompt: "Summarize this Google Doc." },
   { kind: "suggest_edits", label: "Suggest edits", prompt: "Suggest edits for this Google Doc." }
@@ -720,9 +722,16 @@ export function DogfoodAssistantSurface({
   const [submitting, setSubmitting] = useState(false);
   const [actionSubmitting, setActionSubmitting] = useState<string | null>(null);
   const [streamRefreshing, setStreamRefreshing] = useState(false);
+  const [streamConnecting, setStreamConnecting] = useState(false);
+  const [streamOpen, setStreamOpen] = useState(false);
   const [contextConsenting, setContextConsenting] = useState(false);
+  const [googleReconnecting, setGoogleReconnecting] = useState(false);
+  const [googleReconnectMessage, setGoogleReconnectMessage] = useState<string | null>(null);
   const [streamRefreshError, setStreamRefreshError] = useState<string | null>(null);
   const [actionRouteStates, setActionRouteStates] = useState<Record<string, DogfoodLocalActionRouteState>>({});
+  const contextConsentAttemptKey = useRef<string | null>(null);
+  const streamAbortController = useRef<AbortController | null>(null);
+  const latestStreamState = useRef(dogfoodStreamState);
   const sidebarInput = useMemo(
     () =>
       contextConsentResult?.status === "granted" && input.context === "consent_required"
@@ -745,6 +754,55 @@ export function DogfoodAssistantSurface({
   const commandPlaceholder = sidebarState.canSubmitCommand
     ? "Ask for a summary or edit suggestions"
     : firstBlockingDependency?.message ?? "Refresh readiness before submitting";
+  const canEnsureContextConsent =
+    input.context === "consent_required" &&
+    input.productAuth === "signed_in" &&
+    input.googleOAuth === "connected" &&
+    Boolean(sidebarState.activeDocumentId);
+  const shouldAutoEnsureContextConsent =
+    canEnsureContextConsent && contextConsentResult?.status !== "granted" && contextConsentResult?.status !== "dependency_error";
+
+  useEffect(() => {
+    latestStreamState.current = dogfoodStreamState;
+  }, [dogfoodStreamState]);
+
+  useEffect(() => {
+    if (!shouldAutoEnsureContextConsent || contextConsenting || !sidebarState.activeDocumentId) {
+      return;
+    }
+
+    const attemptKey = `${getRuntimeEnvValue("VITE_DEMO_SESSION_ID", "session_dogfood_sidebar")}:${sidebarState.activeDocumentId}`;
+    if (contextConsentAttemptKey.current === attemptKey) {
+      return;
+    }
+    contextConsentAttemptKey.current = attemptKey;
+    void ensureContextConsent();
+  }, [contextConsenting, shouldAutoEnsureContextConsent, sidebarState.activeDocumentId]);
+
+  useEffect(() => {
+    if (!sidebarState.canOpenStream) {
+      streamAbortController.current?.abort();
+      streamAbortController.current = null;
+      setStreamConnecting(false);
+      setStreamRefreshing(false);
+      setStreamOpen(false);
+      return;
+    }
+
+    if (streamAbortController.current) {
+      return;
+    }
+
+    void openSessionStream({ manual: false });
+
+    return () => {
+      streamAbortController.current?.abort();
+      streamAbortController.current = null;
+      setStreamConnecting(false);
+      setStreamRefreshing(false);
+      setStreamOpen(false);
+    };
+  }, [authProvider, sidebarState.canOpenStream, streamRouteFetcher]);
 
   async function submitCommand(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
@@ -841,10 +899,23 @@ export function DogfoodAssistantSurface({
   }
 
   async function refreshSessionState(): Promise<void> {
-    setStreamRefreshing(true);
+    streamAbortController.current?.abort();
+    streamAbortController.current = null;
+    setStreamOpen(false);
+    await openSessionStream({ manual: true });
+  }
+
+  async function openSessionStream({ manual }: { manual: boolean }): Promise<void> {
+    if (manual) {
+      setStreamRefreshing(true);
+    } else {
+      setStreamConnecting(true);
+    }
     setStreamRefreshError(null);
+    const abortController = new AbortController();
+    streamAbortController.current = abortController;
     try {
-      const authorization = await (authProvider ?? createRuntimeDogfoodAuthProvider())();
+      const authorization = await resolveStreamAuthorization(authProvider ?? createRuntimeDogfoodAuthProvider());
       const fetcher = createAuthorizedStreamFetcher(authorization, streamRouteFetcher);
       const result = await fetchSessionStreamRoute({
         streamUrl: createSessionStreamUrl(
@@ -852,16 +923,70 @@ export function DogfoodAssistantSurface({
           getRuntimeEnvValue("VITE_SESSION_STREAM_PATH", "/sessions/{sessionId}/events"),
           getRuntimeEnvValue("VITE_DEMO_SESSION_ID", "session_dogfood_sidebar")
         ),
-        lastEventId: dogfoodStreamState.lastEventId,
-        initialState: dogfoodStreamState,
+        lastEventId: latestStreamState.current.lastEventId,
+        initialState: latestStreamState.current,
         fetcher,
-        onState: setDogfoodStreamState
+        onResponse: (response) => {
+          if (streamAbortController.current !== abortController) {
+            return;
+          }
+          setStreamRefreshing(false);
+          setStreamConnecting(false);
+          setStreamOpen(response.ok);
+          if (!response.ok) {
+            setStreamRefreshError(formatSessionStreamHttpError(response.status, response.contentType));
+          }
+        },
+        onState: setDogfoodStreamState,
+        signal: abortController.signal
       });
       setDogfoodStreamState(result.state);
-    } catch {
-      setStreamRefreshError("Session stream refresh is unavailable from this browser session.");
+      if (!result.ok) {
+        setStreamRefreshError(formatSessionStreamHttpError(result.status, result.contentType));
+        setStreamOpen(false);
+      }
+    } catch (error) {
+      if (!isAbortError(error)) {
+        setStreamRefreshError(formatSessionStreamTransportError(error));
+      }
+      setStreamOpen(false);
     } finally {
-      setStreamRefreshing(false);
+      if (streamAbortController.current === abortController) {
+        streamAbortController.current = null;
+      }
+      if (manual) {
+        setStreamRefreshing(false);
+      } else {
+        setStreamConnecting(false);
+      }
+    }
+  }
+
+  async function reconnectGoogleOAuth(): Promise<void> {
+    const runtime = getBrowserExtensionRuntime();
+    if (!runtime?.sendMessage) {
+      setGoogleReconnectMessage("Google reconnect is available from the browser extension.");
+      return;
+    }
+
+    setGoogleReconnecting(true);
+    setGoogleReconnectMessage(null);
+    try {
+      const response = (await runtime.sendMessage({ type: "AI_ASSIST_GOOGLE_RECONNECT" })) as {
+        ok?: boolean;
+        error?: string;
+        googleOAuth?: { status?: string; message?: string; displayName?: string };
+      };
+      if (!response?.ok) {
+        setGoogleReconnectMessage(response?.error ?? "Google reconnect did not start.");
+        return;
+      }
+      setContextConsentResult(null);
+      setGoogleReconnectMessage(response.googleOAuth?.message ?? response.googleOAuth?.displayName ?? "Google authorization is open.");
+    } catch {
+      setGoogleReconnectMessage("Google reconnect did not start from this browser session.");
+    } finally {
+      setGoogleReconnecting(false);
     }
   }
 
@@ -872,10 +997,23 @@ export function DogfoodAssistantSurface({
           <p className="eyebrow">AI Assist</p>
           <h1 id="app-title">Chat with this doc</h1>
         </div>
-        <span className={`readiness-badge ${sidebarState.canSubmitCommand ? "ready" : "blocked"}`}>
-          {sidebarState.canSubmitCommand ? "Connected" : "Setup needed"}
-        </span>
+        <div className="dogfood-header-actions">
+          {input.productAuth === "signed_in" ? (
+            <button disabled={googleReconnecting} onClick={() => void reconnectGoogleOAuth()} type="button">
+              {googleReconnecting ? "Reconnecting" : "Reconnect Google"}
+            </button>
+          ) : null}
+          <span className={`readiness-badge ${sidebarState.canSubmitCommand ? "ready" : "blocked"}`}>
+            {sidebarState.canSubmitCommand ? "Connected" : "Setup needed"}
+          </span>
+        </div>
       </header>
+
+      {googleReconnectMessage ? (
+        <section className="assistant-status-grid" aria-label="Google reconnect status">
+          <StatusPanel label="Google" status={googleReconnecting ? "connecting" : "check authorization"} detail={googleReconnectMessage} />
+        </section>
+      ) : null}
 
       {setupBlockers.length > 0 ? (
         <section className="readiness-controls" aria-label="Sidebar setup controls">
@@ -906,11 +1044,11 @@ export function DogfoodAssistantSurface({
       {input.context === "consent_required" && contextConsentResult?.status !== "granted" ? (
         <section className="readiness-controls" aria-label="Context consent controls">
           <ReadinessControl
-            actionLabel={contextConsenting ? "Requesting" : "Allow context"}
-            disabled={contextConsenting || input.productAuth !== "signed_in" || input.googleOAuth !== "connected" || !sidebarState.activeDocumentId}
+            actionLabel={contextConsenting ? "Preparing" : "Allow context"}
+            disabled={contextConsenting || !canEnsureContextConsent}
             label="Document context"
             onAction={ensureContextConsent}
-            status={contextConsentResult?.message ?? "Consent required"}
+            status={contextConsenting ? "Preparing document context" : contextConsentResult?.message ?? "Consent required"}
             tone="blocked"
           />
         </section>
@@ -939,8 +1077,10 @@ export function DogfoodAssistantSurface({
         proposedActions={proposedActions}
         onRefresh={refreshSessionState}
         sidebarState={sidebarState}
+        streamConnecting={streamConnecting}
         streamRefreshError={streamRefreshError}
         streamRefreshing={streamRefreshing}
+        streamOpen={streamOpen}
         streamState={dogfoodStreamState}
       />
 
@@ -1012,8 +1152,10 @@ export function DogfoodSessionStatePanel({
   onAction,
   proposedActions,
   sidebarState,
+  streamConnecting,
   streamRefreshError,
   streamRefreshing,
+  streamOpen,
   streamState
 }: {
   actionResult: DogfoodActionRouteResult | null;
@@ -1023,8 +1165,10 @@ export function DogfoodSessionStatePanel({
   onAction: (kind: DogfoodActionRouteKind, action: ProposedActionView) => Promise<void>;
   proposedActions: ProposedActionView[];
   sidebarState: DogfoodSidebarState;
+  streamConnecting: boolean;
   streamRefreshError: string | null;
   streamRefreshing: boolean;
+  streamOpen: boolean;
   streamState: SessionStreamClientState;
 }): ReactElement {
   return (
@@ -1032,10 +1176,10 @@ export function DogfoodSessionStatePanel({
       <article className="assistant-stream-panel">
         <header>
           <h2>Chat</h2>
-          <span>{streamRefreshing ? "Refreshing" : streamState.reconnectRequired ? "Refresh required" : streamState.session.connection}</span>
+          <span>{streamRefreshing ? "Reconnecting" : streamConnecting || streamOpen ? "Listening" : streamState.reconnectRequired ? "Reconnect required" : streamState.session.connection}</span>
         </header>
         <button disabled={!sidebarState.canOpenStream || streamRefreshing} onClick={() => void onRefresh()} type="button">
-          {streamRefreshing ? "Checking for replies" : "Check for replies"}
+          {streamRefreshing ? "Reconnecting" : "Reconnect stream"}
         </button>
         {streamState.session.progress.length > 0 ? (
           <ul className="stream-list" aria-label="Assistant progress">
@@ -1368,7 +1512,7 @@ function getRuntimeEnvValue(key: string, fallback: string): string {
   return typeof value === "string" && value.trim() ? value.trim() : fallback;
 }
 
-function getRuntimeSearchValue(key: string): string | null {
+export function getRuntimeSearchValue(key: string): string | null {
   if (typeof window === "undefined") {
     return null;
   }
@@ -1377,6 +1521,7 @@ function getRuntimeSearchValue(key: string): string | null {
     VITE_API_BASE_URL: "apiBaseUrl",
     VITE_SSE_BASE_URL: "sseBaseUrl",
     VITE_DEMO_SESSION_ID: "sessionId",
+    VITE_CONTEXT_CONSENT_PATH: "contextConsentPath",
     VITE_COMMAND_CREATE_PATH: "commandCreatePath",
     VITE_ACTION_DECISION_PATH: "actionDecisionPath",
     VITE_ACTION_APPLY_PATH: "actionApplyPath",
@@ -1649,6 +1794,30 @@ function createAuthorizedStreamFetcher(
         Authorization: authorization
       }
     });
+}
+
+async function resolveStreamAuthorization(authProvider: DogfoodCommandAuthProvider): Promise<string> {
+  const authorization = await authProvider();
+  if (!authorization.startsWith("Bearer ")) {
+    throw new Error(SESSION_STREAM_AUTH_UNAVAILABLE_MESSAGE);
+  }
+  return authorization;
+}
+
+function formatSessionStreamHttpError(status: number, contentType: string | null): string {
+  return `${SESSION_STREAM_UNAVAILABLE_MESSAGE} HTTP ${status}${contentType ? `; ${contentType}` : ""}.`;
+}
+
+function formatSessionStreamTransportError(error: unknown): string {
+  if (error instanceof Error && error.message === SESSION_STREAM_AUTH_UNAVAILABLE_MESSAGE) {
+    return SESSION_STREAM_AUTH_UNAVAILABLE_MESSAGE;
+  }
+  const errorType = error instanceof Error ? error.name : typeof error;
+  return `${SESSION_STREAM_UNAVAILABLE_MESSAGE} ${errorType}.`;
+}
+
+function isAbortError(error: unknown): boolean {
+  return error instanceof DOMException && error.name === "AbortError";
 }
 
 function ReadinessScenario({ scenario }: { scenario: GoogleDocsReadinessViewModel }): ReactElement {

@@ -39,6 +39,7 @@ describe("session stream client helpers", () => {
 
   it("receives deployed-shaped SSE route events and carries Last-Event-ID on reconnect", async () => {
     const requestedHeaders: Record<string, string>[] = [];
+    const responses: Array<{ ok: boolean; status: number; contentType: string | null }> = [];
     const stateUpdates: string[] = [];
     const routeFetch: SessionStreamRouteFetch = async (_streamUrl, init) => {
       requestedHeaders.push(init.headers);
@@ -105,6 +106,9 @@ describe("session stream client helpers", () => {
       streamUrl: "https://sse.dev.example.test/sessions/session-route/events",
       lastEventId: "evt-route-0",
       fetcher: routeFetch,
+      onResponse: (response) => {
+        responses.push(response);
+      },
       onState: (state) => {
         stateUpdates.push(
           `${state.session.lastEventId ?? "none"}:${state.session.progress.length}:${state.session.messages[0]?.content ?? ""}`
@@ -113,6 +117,7 @@ describe("session stream client helpers", () => {
     });
 
     expect(requestedHeaders).toEqual([{ [LAST_EVENT_ID_HEADER]: "evt-route-0" }]);
+    expect(responses).toEqual([{ ok: true, status: 200, contentType: "text/event-stream" }]);
     expect(result.ok).toBe(true);
     expect(result.status).toBe(200);
     expect(result.contentType).toBe("text/event-stream");

@@ -17,7 +17,11 @@
       "run_at": "document_idle"
     }
   ],
-  "host_permissions": ["https://docs.google.com/document/*", "https://*.execute-api.us-west-2.amazonaws.com/*"],
+  "host_permissions": [
+    "https://docs.google.com/document/*",
+    "https://*.execute-api.us-west-2.amazonaws.com/*",
+    "https://sse.dev.melsifen-ai-assist.com/*"
+  ],
   "permissions": ["activeTab", "identity", "sidePanel", "storage", "tabs"],
   "side_panel": {
     "default_path": "sidepanel.html"

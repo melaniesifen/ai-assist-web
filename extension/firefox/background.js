@@ -4,6 +4,7 @@ const DOCUMENT_CONTEXTS_BY_TAB_STORAGE_KEY = "aiAssistDocumentContextsByTab";
 const PRODUCT_AUTH_SCOPES = ["openid", "email", "profile"];
 const GOOGLE_OAUTH_STATUS_PATH = "/oauth/google/status";
 const GOOGLE_OAUTH_START_PATH = "/oauth/google/start";
+const GOOGLE_OAUTH_CONNECTION_PATH = "/oauth/google/connection";
 const GOOGLE_DOCS_DOCUMENT_ID_PATTERN = /^\/document\/(?:u\/\d+\/)?d\/([A-Za-z0-9_-]+)(?:\/|$)/;
 let productAuthState = {
   status: "signed_out",
@@ -54,6 +55,12 @@ browser.runtime.onMessage.addListener((message, sender) => {
 
   if (message?.type === "AI_ASSIST_GOOGLE_CONNECT") {
     return startGoogleOAuthConnect()
+      .then((googleOAuth) => ({ ok: true, googleOAuth: publicGoogleOAuthState(googleOAuth) }))
+      .catch((error) => ({ ok: false, error: safeErrorMessage(error) }));
+  }
+
+  if (message?.type === "AI_ASSIST_GOOGLE_RECONNECT") {
+    return reconnectGoogleOAuth()
       .then((googleOAuth) => ({ ok: true, googleOAuth: publicGoogleOAuthState(googleOAuth) }))
       .catch((error) => ({ ok: false, error: safeErrorMessage(error) }));
   }
@@ -270,6 +277,31 @@ async function startGoogleOAuthConnect() {
   }
   googleOAuthState = connectingGoogleState();
   return googleOAuthState;
+}
+
+async function reconnectGoogleOAuth() {
+  const config = await loadConfigFromStorage();
+  const authorization = await readAuthorizationHeader();
+  if (!authorization) {
+    googleOAuthState = authExpiredGoogleState();
+    return googleOAuthState;
+  }
+
+  googleOAuthState = connectingGoogleState();
+  const response = await fetch(joinUrl(config.apiBaseUrl, GOOGLE_OAUTH_CONNECTION_PATH), {
+    method: "DELETE",
+    headers: {
+      Authorization: authorization
+    }
+  });
+  const body = await safeJson(response);
+
+  if (!response.ok && response.status !== 404) {
+    googleOAuthState = mapGoogleOAuthStatusResponse(response.status, body);
+    return googleOAuthState;
+  }
+
+  return startGoogleOAuthConnect();
 }
 
 async function loadConfigFromStorage() {

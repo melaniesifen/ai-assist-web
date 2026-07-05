@@ -18,7 +18,8 @@ describe("extension package", () => {
     expect(chromeManifest.permissions).toEqual(expect.arrayContaining(["identity", "sidePanel", "storage", "tabs"]));
     expect(chromeManifest.host_permissions).toEqual([
       "https://docs.google.com/document/*",
-      "https://*.execute-api.us-west-2.amazonaws.com/*"
+      "https://*.execute-api.us-west-2.amazonaws.com/*",
+      "https://sse.dev.melsifen-ai-assist.com/*"
     ]);
     expect(chromeManifest.content_scripts[0]).toMatchObject({
       matches: ["https://docs.google.com/document/*"],
@@ -37,7 +38,8 @@ describe("extension package", () => {
         "storage",
         "tabs",
         "https://docs.google.com/document/*",
-        "https://*.execute-api.us-west-2.amazonaws.com/*"
+        "https://*.execute-api.us-west-2.amazonaws.com/*",
+        "https://sse.dev.melsifen-ai-assist.com/*"
       ])
     );
     expect(firefoxManifest.content_scripts[0]).toMatchObject({
@@ -115,10 +117,13 @@ describe("extension package", () => {
   it("starts Google OAuth from the extension background with bearer headers and safe redirect targets", () => {
     for (const backgroundScript of [chromeServiceWorkerScript, firefoxBackgroundScript]) {
       expect(backgroundScript).toContain("AI_ASSIST_GOOGLE_CONNECT");
+      expect(backgroundScript).toContain("AI_ASSIST_GOOGLE_RECONNECT");
       expect(backgroundScript).toContain("AI_ASSIST_GOOGLE_OAUTH_STATUS");
       expect(backgroundScript).toContain("GOOGLE_OAUTH_START_PATH = \"/oauth/google/start\"");
       expect(backgroundScript).toContain("GOOGLE_OAUTH_STATUS_PATH = \"/oauth/google/status\"");
+      expect(backgroundScript).toContain("GOOGLE_OAUTH_CONNECTION_PATH = \"/oauth/google/connection\"");
       expect(backgroundScript).toContain("Authorization: authorization");
+      expect(backgroundScript).toContain("method: \"DELETE\"");
       expect(backgroundScript).toContain("body: JSON.stringify({ redirectTarget: googleOAuthRedirectTarget(config) })");
       expect(backgroundScript).toContain("googleOAuthRedirectTarget ?? config.cognitoRedirectUri");
     }
