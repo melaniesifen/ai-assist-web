@@ -104,6 +104,8 @@ describe("extension package", () => {
     expect(firefoxSidebarScript).toContain("appUrl.searchParams.set(\"googleOAuthStatus\"");
     expect(chromeSidepanelScript).toContain("appUrl.searchParams.set(\"contextStatus\"");
     expect(firefoxSidebarScript).toContain("appUrl.searchParams.set(\"contextStatus\"");
+    expect(chromeSidepanelScript).toContain("canAttemptBackendCommand ? \"consent_required\" : \"idle\"");
+    expect(firefoxSidebarScript).toContain("canAttemptBackendCommand ? \"consent_required\" : \"idle\"");
     expect(chromeSidepanelScript).toContain("appUrl.searchParams.set(\"providerStatus\"");
     expect(firefoxSidebarScript).toContain("appUrl.searchParams.set(\"providerStatus\"");
     expect(chromeSidepanelScript).toContain("appUrl.searchParams.set(\"commandStatus\"");

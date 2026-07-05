@@ -50,7 +50,7 @@ function openAssistantApp(config, documentContext, activeTabUrl, productAuth, go
   appUrl.searchParams.set("sessionId", config.defaultSessionId);
   appUrl.searchParams.set("productAuthStatus", productAuth?.status ?? "signed_out");
   appUrl.searchParams.set("googleOAuthStatus", googleOAuth?.status ?? "not_connected");
-  appUrl.searchParams.set("contextStatus", canAttemptBackendCommand ? "ready" : "idle");
+  appUrl.searchParams.set("contextStatus", canAttemptBackendCommand ? "consent_required" : "idle");
   appUrl.searchParams.set("providerStatus", canAttemptBackendCommand ? "ready" : "unknown");
   appUrl.searchParams.set("commandStatus", canAttemptBackendCommand ? "ready" : "idle");
   appUrl.searchParams.set("streamStatus", canAttemptBackendCommand ? "open" : "disconnected");
