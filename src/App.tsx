@@ -1310,8 +1310,33 @@ function getRuntimeSearch(): string {
 }
 
 function getRuntimeEnvValue(key: string, fallback: string): string {
+  const queryValue = getRuntimeSearchValue(key);
+  if (queryValue) {
+    return queryValue;
+  }
+
   const value = import.meta.env[key];
   return typeof value === "string" && value.trim() ? value.trim() : fallback;
+}
+
+function getRuntimeSearchValue(key: string): string | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  const queryParamByEnvKey: Record<string, string> = {
+    VITE_API_BASE_URL: "apiBaseUrl",
+    VITE_SSE_BASE_URL: "sseBaseUrl",
+    VITE_DEMO_SESSION_ID: "sessionId",
+    VITE_COMMAND_CREATE_PATH: "commandCreatePath",
+    VITE_ACTION_DECISION_PATH: "actionDecisionPath",
+    VITE_ACTION_APPLY_PATH: "actionApplyPath",
+    VITE_SESSION_STREAM_PATH: "sessionStreamPath"
+  };
+  const rawValue = new URLSearchParams(window.location.search).get(queryParamByEnvKey[key] ?? key);
+  const value = rawValue?.trim();
+
+  return value ? value : null;
 }
 
 function getExtensionRuntimeAuthBridge(): ExtensionRuntimeAuthBridge | null {

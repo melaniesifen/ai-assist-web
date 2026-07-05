@@ -41,6 +41,8 @@ function renderBridge(config, documentContext, productAuth, googleOAuth) {
 
 function openAssistantApp(config, documentContext, activeTabUrl, productAuth, googleOAuth) {
   const appUrl = new URL(browser.runtime.getURL("dist/index.html"));
+  const canAttemptBackendCommand =
+    productAuth?.status === "signed_in" && googleOAuth?.status === "connected" && Boolean(documentContext?.documentId);
   appUrl.searchParams.set("documentId", documentContext?.documentId ?? "");
   appUrl.searchParams.set("activeTabUrl", activeTabUrl ?? "");
   appUrl.searchParams.set("apiBaseUrl", config.apiBaseUrl);
@@ -48,6 +50,12 @@ function openAssistantApp(config, documentContext, activeTabUrl, productAuth, go
   appUrl.searchParams.set("sessionId", config.defaultSessionId);
   appUrl.searchParams.set("productAuthStatus", productAuth?.status ?? "signed_out");
   appUrl.searchParams.set("googleOAuthStatus", googleOAuth?.status ?? "not_connected");
+  appUrl.searchParams.set("contextStatus", canAttemptBackendCommand ? "ready" : "idle");
+  appUrl.searchParams.set("providerStatus", canAttemptBackendCommand ? "ready" : "unknown");
+  appUrl.searchParams.set("commandStatus", canAttemptBackendCommand ? "ready" : "idle");
+  appUrl.searchParams.set("streamStatus", canAttemptBackendCommand ? "open" : "disconnected");
+  appUrl.searchParams.set("proposedActionsStatus", "none");
+  appUrl.searchParams.set("applyStatus", "blocked");
   ASSISTANT_APP_FRAME.src = appUrl.toString();
 }
 

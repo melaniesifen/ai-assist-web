@@ -75,6 +75,18 @@ describe("dogfood sidebar shell", () => {
     });
   });
 
+  it("enables command submission when the extension supplies connected readiness gates", () => {
+    const input = createDogfoodSidebarInputFromSearch(
+      "?documentId=doc_connected_123&productAuthStatus=signed_in&googleOAuthStatus=connected&contextStatus=ready&providerStatus=ready&commandStatus=ready&streamStatus=open",
+      null
+    );
+    const state = createDogfoodSidebarState(input);
+
+    expect(state.canSubmitCommand).toBe(true);
+    expect(state.activeDocumentId).toBe("doc_connected_123");
+    expect(state.blockers.map((blocker) => blocker.area)).toEqual(["apply", "apply"]);
+  });
+
   it("prevents default form navigation while backend command submission is pending", () => {
     let prevented = false;
 

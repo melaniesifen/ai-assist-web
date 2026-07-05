@@ -91,6 +91,12 @@ describe("extension package", () => {
     expect(firefoxSidebarScript).toContain("appUrl.searchParams.set(\"productAuthStatus\"");
     expect(chromeSidepanelScript).toContain("appUrl.searchParams.set(\"googleOAuthStatus\"");
     expect(firefoxSidebarScript).toContain("appUrl.searchParams.set(\"googleOAuthStatus\"");
+    expect(chromeSidepanelScript).toContain("appUrl.searchParams.set(\"contextStatus\"");
+    expect(firefoxSidebarScript).toContain("appUrl.searchParams.set(\"contextStatus\"");
+    expect(chromeSidepanelScript).toContain("appUrl.searchParams.set(\"providerStatus\"");
+    expect(firefoxSidebarScript).toContain("appUrl.searchParams.set(\"providerStatus\"");
+    expect(chromeSidepanelScript).toContain("appUrl.searchParams.set(\"commandStatus\"");
+    expect(firefoxSidebarScript).toContain("appUrl.searchParams.set(\"commandStatus\"");
   });
 
   it("starts Google OAuth from the extension background with bearer headers and safe redirect targets", () => {
