@@ -716,9 +716,9 @@ export function DogfoodAssistantSurface({
   const [streamRefreshing, setStreamRefreshing] = useState(false);
   const [streamRefreshError, setStreamRefreshError] = useState<string | null>(null);
   const [actionRouteStates, setActionRouteStates] = useState<Record<string, DogfoodLocalActionRouteState>>({});
-  const firstBlockingDependency = state.blockers.find((blocker) =>
-    ["auth", "google", "document", "context", "provider", "command"].includes(blocker.area)
-  );
+  const setupBlockers = state.blockers.filter((blocker) => ["auth", "google", "document"].includes(blocker.area));
+  const commandBlockers = state.blockers.filter((blocker) => ["auth", "google", "document", "context", "provider", "command"].includes(blocker.area));
+  const firstBlockingDependency = commandBlockers[0];
   const proposedActions = Object.values(dogfoodStreamState.session.proposedActions);
   const canSubmit = state.canSubmitCommand && !submitting;
   const commandPlaceholder = state.canSubmitCommand
@@ -828,57 +828,51 @@ export function DogfoodAssistantSurface({
       <header className="dogfood-header">
         <div>
           <p className="eyebrow">AI Assist</p>
-          <h1 id="app-title">Assistant for this document</h1>
+          <h1 id="app-title">Chat with this doc</h1>
         </div>
         <span className={`readiness-badge ${state.canSubmitCommand ? "ready" : "blocked"}`}>
-          {state.canSubmitCommand ? "Ready" : "Blocked"}
+          {state.canSubmitCommand ? "Connected" : "Setup needed"}
         </span>
       </header>
 
-      <section className="readiness-controls" aria-label="Sidebar readiness controls">
-        <ReadinessControl
-          actionLabel={input.productAuth === "signed_in" ? "Signed in" : "Sign in"}
-          disabled={input.productAuth === "signed_in" || input.productAuth === "signing_in"}
-          label="Product login"
-          status={formatProductAuth(input.productAuth)}
-          tone={input.productAuth === "signed_in" ? "ready" : "blocked"}
-        />
-        <ReadinessControl
-          actionLabel={input.googleOAuth === "reconnect_required" ? "Reconnect" : "Connect"}
-          disabled={input.productAuth !== "signed_in" || input.googleOAuth === "connected" || input.googleOAuth === "connecting"}
-          label="Google"
-          status={formatGoogleOAuth(input.googleOAuth)}
-          tone={input.googleOAuth === "connected" ? "ready" : "blocked"}
-        />
-        <ReadinessControl
-          actionLabel="Refresh"
-          disabled={input.activeDocument.status !== "missing_document_id"}
-          label="Active document"
-          status={state.activeDocumentId ?? formatActiveDocument(input)}
-          tone={state.activeDocumentId ? "ready" : "blocked"}
-        />
-        <ReadinessControl
-          actionLabel="Refresh"
-          disabled={input.productAuth !== "signed_in" || input.googleOAuth !== "connected" || input.context === "ready"}
-          label="Context"
-          status={formatContext(input.context)}
-          tone={input.context === "ready" ? "ready" : "blocked"}
-        />
-        <ReadinessControl
-          actionLabel="Refresh"
-          disabled={input.provider === "ready"}
-          label="Provider"
-          status={formatProvider(input.provider)}
-          tone={input.provider === "ready" ? "ready" : "blocked"}
-        />
-        <ReadinessControl
-          actionLabel={state.canSubmitCommand ? "Ready" : "Blocked"}
-          disabled
-          label="Command"
-          status={formatCommandReadiness(state)}
-          tone={state.canSubmitCommand ? "ready" : "blocked"}
-        />
-      </section>
+      {setupBlockers.length > 0 ? (
+        <section className="readiness-controls" aria-label="Sidebar setup controls">
+          <ReadinessControl
+            actionLabel={input.productAuth === "signed_in" ? "Signed in" : "Sign in"}
+            disabled={input.productAuth === "signed_in" || input.productAuth === "signing_in"}
+            label="Product login"
+            status={formatProductAuth(input.productAuth)}
+            tone={input.productAuth === "signed_in" ? "ready" : "blocked"}
+          />
+          <ReadinessControl
+            actionLabel={input.googleOAuth === "reconnect_required" ? "Reconnect" : "Connect"}
+            disabled={input.productAuth !== "signed_in" || input.googleOAuth === "connected" || input.googleOAuth === "connecting"}
+            label="Google"
+            status={formatGoogleOAuth(input.googleOAuth)}
+            tone={input.googleOAuth === "connected" ? "ready" : "blocked"}
+          />
+          <ReadinessControl
+            actionLabel="Refresh"
+            disabled={input.activeDocument.status !== "missing_document_id"}
+            label="Active document"
+            status={state.activeDocumentId ?? formatActiveDocument(input)}
+            tone={state.activeDocumentId ? "ready" : "blocked"}
+          />
+        </section>
+      ) : null}
+
+      <DogfoodSessionStatePanel
+        actionResult={actionResult}
+        actionSubmitting={actionSubmitting}
+        actionRouteStates={actionRouteStates}
+        onAction={submitActionRoute}
+        proposedActions={proposedActions}
+        onRefresh={refreshSessionState}
+        sidebarState={state}
+        streamRefreshError={streamRefreshError}
+        streamRefreshing={streamRefreshing}
+        streamState={dogfoodStreamState}
+      />
 
       <section className="assistant-command" aria-label="Assistant command">
         <div className="quick-commands" aria-label="Common commands">
@@ -916,43 +910,26 @@ export function DogfoodAssistantSurface({
         {commandResult ? <DogfoodCommandResultPanel result={commandResult} /> : null}
       </section>
 
-      <DogfoodSessionStatePanel
-        actionResult={actionResult}
-        actionSubmitting={actionSubmitting}
-        actionRouteStates={actionRouteStates}
-        onAction={submitActionRoute}
-        proposedActions={proposedActions}
-        onRefresh={refreshSessionState}
-        sidebarState={state}
-        streamRefreshError={streamRefreshError}
-        streamRefreshing={streamRefreshing}
-        streamState={dogfoodStreamState}
-      />
+      {!state.canSubmitCommand && setupBlockers.length === 0 ? (
+        <section className="assistant-status-grid" aria-label="Assistant status">
+          <StatusPanel label="Context" status={formatContext(input.context)} detail={formatCommandReadiness(state)} />
+          <StatusPanel label="Provider" status={formatProvider(input.provider)} detail={formatReviewReadiness(state)} />
+          <StatusPanel
+            label="Safe log"
+            status="metadata only"
+            detail={safeDogfoodSidebarLogExcludesForbiddenContent(state.safeLogEvent) ? "No raw document, prompt, token, provider, or action payload content." : "Blocked by unsafe metadata."}
+          />
+        </section>
+      ) : null}
 
-      <section className="assistant-status-grid" aria-label="Assistant status">
-        <StatusPanel label="Stream" status={state.streamReadiness} detail={formatStream(input, state)} />
-        <StatusPanel label="Proposed actions" status={formatProposedActions(input)} detail={formatReviewReadiness(state)} />
-        <StatusPanel label="Apply" status={state.applyReadiness} detail={formatApplyReadiness(input, state)} />
-        <StatusPanel
-          label="Safe log"
-          status="metadata only"
-          detail={safeDogfoodSidebarLogExcludesForbiddenContent(state.safeLogEvent) ? "No raw document, prompt, token, provider, or action payload content." : "Blocked by unsafe metadata."}
-        />
-      </section>
-
-      {state.blockers.length > 0 ? (
+      {!state.canSubmitCommand && commandBlockers.length > 0 ? (
         <section className="blocker-list" aria-label="Current blockers">
           <h2>What is blocking the assistant</h2>
-          {state.blockers.slice(0, 5).map((blocker) => (
+          {commandBlockers.slice(0, 5).map((blocker) => (
             <BlockerRow blocker={blocker} key={`${blocker.area}-${blocker.code}`} />
           ))}
         </section>
-      ) : (
-        <section className="assistant-ready-note" aria-label="Ready state">
-          <h2>Ready for a read-only command</h2>
-          <p>Commands remain backend-owned. The sidebar sends document identity and product auth context, not raw document content.</p>
-        </section>
-      )}
+      ) : null}
     </section>
   );
 }
@@ -984,11 +961,11 @@ export function DogfoodSessionStatePanel({
     <section className="dogfood-session-state" aria-label="Assistant stream and proposed actions">
       <article className="assistant-stream-panel">
         <header>
-          <h2>Assistant messages</h2>
+          <h2>Chat</h2>
           <span>{streamRefreshing ? "Refreshing" : streamState.reconnectRequired ? "Refresh required" : streamState.session.connection}</span>
         </header>
         <button disabled={!sidebarState.canOpenStream || streamRefreshing} onClick={() => void onRefresh()} type="button">
-          {streamRefreshing ? "Refreshing stream" : "Refresh stream"}
+          {streamRefreshing ? "Checking for replies" : "Check for replies"}
         </button>
         {streamState.session.progress.length > 0 ? (
           <ul className="stream-list" aria-label="Assistant progress">
@@ -999,7 +976,7 @@ export function DogfoodSessionStatePanel({
         ) : null}
         <div className="message-list">
           {streamState.session.messages.length === 0 ? (
-            <p className="empty-state">Assistant output will appear here when SSE or durable session state is available.</p>
+            <p className="empty-state">Ask a question about this Google Doc.</p>
           ) : (
             streamState.session.messages.map((message) => (
               <p className={`message ${message.role}`} key={message.messageId}>
@@ -1023,11 +1000,11 @@ export function DogfoodSessionStatePanel({
 
       <article className="assistant-action-panel">
         <header>
-          <h2>Proposed edits</h2>
+          <h2>Suggested edits</h2>
           <span>{proposedActions.length === 0 ? "No backend actions" : `${proposedActions.length} backend action${proposedActions.length === 1 ? "" : "s"}`}</span>
         </header>
         {proposedActions.length === 0 ? (
-          <p className="empty-state">Review cards stay hidden until backend action state is ready.</p>
+          <p className="empty-state">Edit suggestions will appear here after the assistant proposes them.</p>
         ) : (
           <div className="dogfood-review-list">
             {proposedActions.map((action) => (

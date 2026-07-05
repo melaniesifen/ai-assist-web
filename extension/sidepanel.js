@@ -30,6 +30,7 @@ async function loadRuntimeContext() {
 }
 
 function renderBridge(config, documentContext, productAuth, googleOAuth) {
+  document.documentElement.classList.toggle("assistant-ready", canOpenDocumentChat(documentContext, productAuth, googleOAuth));
   DOCUMENT_ID_ELEMENT.textContent = documentContext?.documentId ?? "No supported Google Doc detected.";
   API_BASE_URL_ELEMENT.textContent = config.apiBaseUrl;
   SSE_BASE_URL_ELEMENT.textContent = config.sseBaseUrl;
@@ -41,8 +42,7 @@ function renderBridge(config, documentContext, productAuth, googleOAuth) {
 
 function openAssistantApp(config, documentContext, activeTabUrl, productAuth, googleOAuth) {
   const appUrl = new URL(chrome.runtime.getURL("dist/index.html"));
-  const canAttemptBackendCommand =
-    productAuth?.status === "signed_in" && googleOAuth?.status === "connected" && Boolean(documentContext?.documentId);
+  const canAttemptBackendCommand = canOpenDocumentChat(documentContext, productAuth, googleOAuth);
   appUrl.searchParams.set("documentId", documentContext?.documentId ?? "");
   appUrl.searchParams.set("activeTabUrl", activeTabUrl ?? "");
   appUrl.searchParams.set("apiBaseUrl", config.apiBaseUrl);
@@ -57,6 +57,10 @@ function openAssistantApp(config, documentContext, activeTabUrl, productAuth, go
   appUrl.searchParams.set("proposedActionsStatus", "none");
   appUrl.searchParams.set("applyStatus", "blocked");
   ASSISTANT_APP_FRAME.src = appUrl.toString();
+}
+
+function canOpenDocumentChat(documentContext, productAuth, googleOAuth) {
+  return productAuth?.status === "signed_in" && googleOAuth?.status === "connected" && Boolean(documentContext?.documentId);
 }
 
 function renderBridgeError(message) {

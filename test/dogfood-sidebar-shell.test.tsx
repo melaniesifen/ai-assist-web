@@ -32,15 +32,13 @@ describe("dogfood sidebar shell", () => {
     const state = createDogfoodSidebarState(CONNECTED_INPUT);
     const html = renderToStaticMarkup(<DogfoodAssistantSurface input={CONNECTED_INPUT} state={state} />);
 
-    expect(html).toContain("Assistant for this document");
-    expect(html).toContain("Product login");
-    expect(html).toContain("Signed in");
-    expect(html).toContain("Google");
+    expect(html).toContain("Chat with this doc");
     expect(html).toContain("Connected");
-    expect(html).toContain("doc_connected_123");
-    expect(html).toContain("Provider");
-    expect(html).toContain("Ready for a read-only command");
+    expect(html).toContain("Chat");
     expect(html).toContain("Summarize this doc");
+    expect(html).toContain("Ask a question about this Google Doc.");
+    expect(html).not.toContain("Product login");
+    expect(html).not.toContain("Google</span>");
     expect(html).not.toContain("Mocked assistant chat");
     expect(html).not.toContain("Proposed edit review cards");
   });
@@ -54,7 +52,7 @@ describe("dogfood sidebar shell", () => {
     const html = renderToStaticMarkup(<DogfoodAssistantSurface input={input} state={state} />);
 
     expect(state.canSubmitCommand).toBe(false);
-    expect(html).toContain("Blocked");
+    expect(html).toContain("Setup needed");
     expect(html).toContain("PRODUCT_AUTH_REQUIRED");
     expect(html).toContain("GOOGLE_OAUTH_REQUIRED");
     expect(html).toContain("ACTIVE_DOCUMENT_REQUIRED");
@@ -162,10 +160,10 @@ describe("dogfood sidebar shell", () => {
       <DogfoodAssistantSurface input={CONNECTED_INPUT} initialSessionStreamState={streamState} state={state} />
     );
 
-    expect(html).toContain("Assistant messages");
+    expect(html).toContain("Chat");
     expect(html).toContain("Reading approved context");
     expect(html).toContain("Draft final answer.");
-    expect(html).toContain("Proposed edits");
+    expect(html).toContain("Suggested edits");
     expect(html).toContain("action_test_backend_001");
     expect(html).toContain("Deterministic test proposal from backend-shaped state.");
     expect(html).toContain("Apply");
