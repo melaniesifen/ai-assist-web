@@ -206,6 +206,13 @@ Relevant design sources: frontend, provider-key, command, SSE, context, proposed
   manual QA, and write/apply actions require explicit approval.
 - [x] M12-T5.4: Reconcile local closeout evidence and update M12/dogfood
   readiness docs from deterministic checks only.
+- [x] M12-T6.3: Add a dogfood context-consent client and sidebar readiness
+  affordance that requests active-resource consent for the detected Google Doc
+  after product sign-in and Google OAuth, then allows command submission once
+  local context readiness becomes ready.
+- [x] M12-T6.4: Cover context-consent route construction, missing active
+  document, missing Google OAuth, dependency errors, metadata-only consent logs,
+  and sidebar rendering with deterministic Vitest tests.
 
 ## E2E-Owned UI Validation
 

@@ -69,6 +69,11 @@ import {
   type DogfoodCommandResult
 } from "./dogfood-command-client";
 import {
+  ensureDogfoodContextConsent,
+  safeDogfoodContextConsentLogExcludesForbiddenContent,
+  type DogfoodContextConsentResult
+} from "./dogfood-context-consent-client";
+import {
   safeDogfoodActionLogExcludesForbiddenContent,
   submitDogfoodActionRoute,
   type DogfoodActionRouteKind,
@@ -707,6 +712,7 @@ export function DogfoodAssistantSurface({
   const [commandPrompt, setCommandPrompt] = useState("");
   const [commandKind, setCommandKind] = useState<DogfoodCommandKind>("custom");
   const [commandResult, setCommandResult] = useState<DogfoodCommandResult | null>(null);
+  const [contextConsentResult, setContextConsentResult] = useState<DogfoodContextConsentResult | null>(null);
   const [actionResult, setActionResult] = useState<DogfoodActionRouteResult | null>(null);
   const [dogfoodStreamState, setDogfoodStreamState] = useState<SessionStreamClientState>(
     initialSessionStreamState ?? createInitialSessionStreamClientState
@@ -714,14 +720,29 @@ export function DogfoodAssistantSurface({
   const [submitting, setSubmitting] = useState(false);
   const [actionSubmitting, setActionSubmitting] = useState<string | null>(null);
   const [streamRefreshing, setStreamRefreshing] = useState(false);
+  const [contextConsenting, setContextConsenting] = useState(false);
   const [streamRefreshError, setStreamRefreshError] = useState<string | null>(null);
   const [actionRouteStates, setActionRouteStates] = useState<Record<string, DogfoodLocalActionRouteState>>({});
-  const setupBlockers = state.blockers.filter((blocker) => ["auth", "google", "document"].includes(blocker.area));
-  const commandBlockers = state.blockers.filter((blocker) => ["auth", "google", "document", "context", "provider", "command"].includes(blocker.area));
+  const sidebarInput = useMemo(
+    () =>
+      contextConsentResult?.status === "granted" && input.context === "consent_required"
+        ? {
+            ...input,
+            context: "ready" as const
+          }
+        : input,
+    [contextConsentResult?.status, input]
+  );
+  const sidebarState = useMemo(
+    () => (sidebarInput === input ? state : createDogfoodSidebarState(sidebarInput)),
+    [input, sidebarInput, state]
+  );
+  const setupBlockers = sidebarState.blockers.filter((blocker) => ["auth", "google", "document"].includes(blocker.area));
+  const commandBlockers = sidebarState.blockers.filter((blocker) => ["auth", "google", "document", "context", "provider", "command"].includes(blocker.area));
   const firstBlockingDependency = commandBlockers[0];
   const proposedActions = Object.values(dogfoodStreamState.session.proposedActions);
-  const canSubmit = state.canSubmitCommand && !submitting;
-  const commandPlaceholder = state.canSubmitCommand
+  const canSubmit = sidebarState.canSubmitCommand && !submitting;
+  const commandPlaceholder = sidebarState.canSubmitCommand
     ? "Ask for a summary or edit suggestions"
     : firstBlockingDependency?.message ?? "Refresh readiness before submitting";
 
@@ -737,8 +758,8 @@ export function DogfoodAssistantSurface({
           commandKind,
           httpBaseUrl: getRuntimeEnvValue("VITE_API_BASE_URL", "http://localhost:8787"),
           sessionId: getRuntimeEnvValue("VITE_DEMO_SESSION_ID", "session_dogfood_sidebar"),
-          activeDocumentId: state.activeDocumentId,
-          sidebarState: state,
+          activeDocumentId: sidebarState.activeDocumentId,
+          sidebarState,
           commandPathTemplate: getRuntimeEnvValue("VITE_COMMAND_CREATE_PATH", "/resource-sessions/{sessionId}/commands")
         },
         {
@@ -748,6 +769,27 @@ export function DogfoodAssistantSurface({
       setCommandResult(result);
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function ensureContextConsent(): Promise<void> {
+    setContextConsenting(true);
+    setContextConsentResult(null);
+    try {
+      const result = await ensureDogfoodContextConsent(
+        {
+          httpBaseUrl: getRuntimeEnvValue("VITE_API_BASE_URL", "http://localhost:8787"),
+          sessionId: getRuntimeEnvValue("VITE_DEMO_SESSION_ID", "session_dogfood_sidebar"),
+          activeDocumentId: sidebarState.activeDocumentId,
+          contextConsentPathTemplate: getRuntimeEnvValue("VITE_CONTEXT_CONSENT_PATH", "/resource-sessions/{sessionId}/context-consent")
+        },
+        {
+          authProvider: authProvider ?? createRuntimeDogfoodAuthProvider()
+        }
+      );
+      setContextConsentResult(result);
+    } finally {
+      setContextConsenting(false);
     }
   }
 
@@ -770,7 +812,7 @@ export function DogfoodAssistantSurface({
           sessionId: action.sessionId ?? "",
           actionId: action.actionId,
           actionStatus: action.status,
-          sidebarState: state,
+          sidebarState,
           decisionPathTemplate: getRuntimeEnvValue("VITE_ACTION_DECISION_PATH", "/resource-sessions/{sessionId}/actions/{actionId}/{decision}"),
           applyPathTemplate: getRuntimeEnvValue("VITE_ACTION_APPLY_PATH", "/resource-sessions/{sessionId}/apply-action")
         },
@@ -830,8 +872,8 @@ export function DogfoodAssistantSurface({
           <p className="eyebrow">AI Assist</p>
           <h1 id="app-title">Chat with this doc</h1>
         </div>
-        <span className={`readiness-badge ${state.canSubmitCommand ? "ready" : "blocked"}`}>
-          {state.canSubmitCommand ? "Connected" : "Setup needed"}
+        <span className={`readiness-badge ${sidebarState.canSubmitCommand ? "ready" : "blocked"}`}>
+          {sidebarState.canSubmitCommand ? "Connected" : "Setup needed"}
         </span>
       </header>
 
@@ -855,8 +897,36 @@ export function DogfoodAssistantSurface({
             actionLabel="Refresh"
             disabled={input.activeDocument.status !== "missing_document_id"}
             label="Active document"
-            status={state.activeDocumentId ?? formatActiveDocument(input)}
-            tone={state.activeDocumentId ? "ready" : "blocked"}
+            status={sidebarState.activeDocumentId ?? formatActiveDocument(sidebarInput)}
+            tone={sidebarState.activeDocumentId ? "ready" : "blocked"}
+          />
+        </section>
+      ) : null}
+
+      {input.context === "consent_required" && contextConsentResult?.status !== "granted" ? (
+        <section className="readiness-controls" aria-label="Context consent controls">
+          <ReadinessControl
+            actionLabel={contextConsenting ? "Requesting" : "Allow context"}
+            disabled={contextConsenting || input.productAuth !== "signed_in" || input.googleOAuth !== "connected" || !sidebarState.activeDocumentId}
+            label="Document context"
+            onAction={ensureContextConsent}
+            status={contextConsentResult?.message ?? "Consent required"}
+            tone="blocked"
+          />
+        </section>
+      ) : null}
+
+      {contextConsentResult ? (
+        <section className="assistant-status-grid" aria-label="Context consent result">
+          <StatusPanel
+            label="Context consent"
+            status={contextConsentResult.status === "granted" ? "ready" : "blocked"}
+            detail={contextConsentResult.message}
+          />
+          <StatusPanel
+            label="Consent log"
+            status="metadata only"
+            detail={safeDogfoodContextConsentLogExcludesForbiddenContent(contextConsentResult.safeLogEvent) ? "No raw document, prompt, token, provider, or action payload content." : "Blocked by unsafe metadata."}
           />
         </section>
       ) : null}
@@ -868,7 +938,7 @@ export function DogfoodAssistantSurface({
         onAction={submitActionRoute}
         proposedActions={proposedActions}
         onRefresh={refreshSessionState}
-        sidebarState={state}
+        sidebarState={sidebarState}
         streamRefreshError={streamRefreshError}
         streamRefreshing={streamRefreshing}
         streamState={dogfoodStreamState}
@@ -910,19 +980,19 @@ export function DogfoodAssistantSurface({
         {commandResult ? <DogfoodCommandResultPanel result={commandResult} /> : null}
       </section>
 
-      {!state.canSubmitCommand && setupBlockers.length === 0 ? (
+      {!sidebarState.canSubmitCommand && setupBlockers.length === 0 ? (
         <section className="assistant-status-grid" aria-label="Assistant status">
-          <StatusPanel label="Context" status={formatContext(input.context)} detail={formatCommandReadiness(state)} />
-          <StatusPanel label="Provider" status={formatProvider(input.provider)} detail={formatReviewReadiness(state)} />
+          <StatusPanel label="Context" status={formatContext(sidebarInput.context)} detail={formatCommandReadiness(sidebarState)} />
+          <StatusPanel label="Provider" status={formatProvider(sidebarInput.provider)} detail={formatReviewReadiness(sidebarState)} />
           <StatusPanel
             label="Safe log"
             status="metadata only"
-            detail={safeDogfoodSidebarLogExcludesForbiddenContent(state.safeLogEvent) ? "No raw document, prompt, token, provider, or action payload content." : "Blocked by unsafe metadata."}
+            detail={safeDogfoodSidebarLogExcludesForbiddenContent(sidebarState.safeLogEvent) ? "No raw document, prompt, token, provider, or action payload content." : "Blocked by unsafe metadata."}
           />
         </section>
       ) : null}
 
-      {!state.canSubmitCommand && commandBlockers.length > 0 ? (
+      {!sidebarState.canSubmitCommand && commandBlockers.length > 0 ? (
         <section className="blocker-list" aria-label="Current blockers">
           <h2>What is blocking the assistant</h2>
           {commandBlockers.slice(0, 5).map((blocker) => (
@@ -1235,12 +1305,14 @@ function ReadinessControl({
   actionLabel,
   disabled,
   label,
+  onAction,
   status,
   tone
 }: {
   actionLabel: string;
   disabled: boolean;
   label: string;
+  onAction?: () => void;
   status: string;
   tone: "ready" | "blocked";
 }): ReactElement {
@@ -1250,7 +1322,7 @@ function ReadinessControl({
         <span>{label}</span>
         <strong>{status}</strong>
       </div>
-      <button disabled={disabled} type="button">
+      <button disabled={disabled} onClick={onAction} type="button">
         {actionLabel}
       </button>
     </article>
