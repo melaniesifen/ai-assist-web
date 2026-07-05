@@ -80,6 +80,16 @@ describe("extension package", () => {
     }
   });
 
+  it("selects document context from the active tab instead of the last reporting Google Doc tab", () => {
+    for (const backgroundScript of [chromeServiceWorkerScript, firefoxBackgroundScript]) {
+      expect(backgroundScript).toContain("DOCUMENT_CONTEXTS_BY_TAB_STORAGE_KEY");
+      expect(backgroundScript).toContain("documentContextForActiveTab(activeTab");
+      expect(backgroundScript).toContain("contextsByTab[String(activeTab.id)]");
+      expect(backgroundScript).toContain("detectDocumentContextFromUrl(activeTab.url");
+      expect(backgroundScript).toContain("GOOGLE_DOCS_DOCUMENT_ID_PATTERN.exec(parsedUrl.pathname)");
+    }
+  });
+
   it("supports Cognito Hosted UI login without putting bearer values in the sidebar iframe URL", () => {
     expect(chromeSidepanelScript).toContain("AI_ASSIST_PRODUCT_SIGN_IN");
     expect(chromeSidepanelScript).toContain("AI_ASSIST_PRODUCT_SIGN_OUT");

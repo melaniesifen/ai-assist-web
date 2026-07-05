@@ -1,8 +1,10 @@
 const CONFIG_STORAGE_KEY = "aiAssistDogfoodConfig";
 const DOCUMENT_CONTEXT_STORAGE_KEY = "aiAssistActiveDocumentContext";
+const DOCUMENT_CONTEXTS_BY_TAB_STORAGE_KEY = "aiAssistDocumentContextsByTab";
 const PRODUCT_AUTH_SCOPES = ["openid", "email", "profile"];
 const GOOGLE_OAUTH_STATUS_PATH = "/oauth/google/status";
 const GOOGLE_OAUTH_START_PATH = "/oauth/google/start";
+const GOOGLE_DOCS_DOCUMENT_ID_PATTERN = /^\/document\/(?:u\/\d+\/)?d\/([A-Za-z0-9_-]+)(?:\/|$)/;
 let productAuthState = {
   status: "signed_out",
   displayName: "Signed out",
@@ -84,22 +86,68 @@ async function persistDocumentContext(tabId, context) {
     updatedAt: new Date().toISOString()
   };
 
-  await browser.storage.local.set({ [DOCUMENT_CONTEXT_STORAGE_KEY]: safeContext });
+  const stored = await browser.storage.local.get([DOCUMENT_CONTEXT_STORAGE_KEY, DOCUMENT_CONTEXTS_BY_TAB_STORAGE_KEY]);
+  const contextsByTab = stored[DOCUMENT_CONTEXTS_BY_TAB_STORAGE_KEY] ?? {};
+  await browser.storage.local.set({
+    [DOCUMENT_CONTEXT_STORAGE_KEY]: safeContext,
+    [DOCUMENT_CONTEXTS_BY_TAB_STORAGE_KEY]: {
+      ...contextsByTab,
+      [String(tabId)]: safeContext
+    }
+  });
 }
 
 async function readRuntimeContext() {
   const [activeTab] = await browser.tabs.query({ active: true, currentWindow: true });
   const stored = await browser.storage.local.get(CONFIG_STORAGE_KEY);
-  const session = await browser.storage.local.get(DOCUMENT_CONTEXT_STORAGE_KEY);
+  const session = await browser.storage.local.get([DOCUMENT_CONTEXT_STORAGE_KEY, DOCUMENT_CONTEXTS_BY_TAB_STORAGE_KEY]);
   const auth = await readProductAuthState();
 
   return {
     config: stored[CONFIG_STORAGE_KEY] ?? (await loadDevConfig()),
-    documentContext: session[DOCUMENT_CONTEXT_STORAGE_KEY] ?? null,
+    documentContext: documentContextForActiveTab(activeTab, session[DOCUMENT_CONTEXTS_BY_TAB_STORAGE_KEY] ?? {}, session[DOCUMENT_CONTEXT_STORAGE_KEY]),
     activeTabUrl: activeTab?.url ?? null,
     productAuth: publicAuthState(auth),
     googleOAuth: publicGoogleOAuthState(await readGoogleOAuthStatus(stored[CONFIG_STORAGE_KEY]))
   };
+}
+
+function documentContextForActiveTab(activeTab, contextsByTab, legacyContext) {
+  if (!activeTab?.id) {
+    return null;
+  }
+
+  const detected = detectDocumentContextFromUrl(activeTab.url, activeTab.id);
+  if (!detected.supported) {
+    return null;
+  }
+
+  const storedForTab = contextsByTab[String(activeTab.id)] ?? (legacyContext?.tabId === activeTab.id ? legacyContext : null);
+  return {
+    ...detected,
+    updatedAt: storedForTab?.updatedAt ?? new Date().toISOString()
+  };
+}
+
+function detectDocumentContextFromUrl(url, tabId) {
+  try {
+    const parsedUrl = new URL(url);
+    const match = parsedUrl.hostname === "docs.google.com" ? GOOGLE_DOCS_DOCUMENT_ID_PATTERN.exec(parsedUrl.pathname) : null;
+
+    return {
+      tabId,
+      href: typeof url === "string" ? url : null,
+      documentId: match?.[1] ?? null,
+      supported: Boolean(match?.[1])
+    };
+  } catch {
+    return {
+      tabId,
+      href: null,
+      documentId: null,
+      supported: false
+    };
+  }
 }
 
 async function signInWithCognitoHostedUi() {
