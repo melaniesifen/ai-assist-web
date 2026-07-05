@@ -257,12 +257,16 @@ async function startGoogleOAuthConnect() {
   }
 
   try {
-    await launchWebAuthFlow(body.authorizationUrl);
+    await openTab(body.authorizationUrl);
   } catch (error) {
-    googleOAuthState = accessDeniedGoogleState(`Google authorization window failed: ${safeErrorMessage(error)}`);
+    const oauthRequest = publicGoogleOAuthRequest(body.authorizationUrl);
+    googleOAuthState = accessDeniedGoogleState(
+      `Google authorization tab failed: ${safeErrorMessage(error)}. client_id=${oauthRequest.clientId}; redirect_uri=${oauthRequest.redirectUri}`
+    );
     throw new Error(googleOAuthState.message);
   }
-  return readGoogleOAuthStatus(config);
+  googleOAuthState = connectingGoogleState();
+  return googleOAuthState;
 }
 
 async function loadConfigFromStorage() {
@@ -370,6 +374,19 @@ function launchWebAuthFlow(url, interactive = true) {
   });
 }
 
+function openTab(url) {
+  return new Promise((resolve, reject) => {
+    chrome.tabs.create({ url, active: true }, (tab) => {
+      const runtimeError = chrome.runtime.lastError;
+      if (runtimeError) {
+        reject(new Error(runtimeError.message));
+        return;
+      }
+      resolve(tab);
+    });
+  });
+}
+
 function assertCognitoConfig(config) {
   if (!hasCognitoConfig(config)) {
     throw new Error("Cognito Hosted UI base URL, client ID, and redirect URI are required.");
@@ -385,7 +402,7 @@ function trimTrailingSlash(value) {
 }
 
 function googleOAuthRedirectTarget(config) {
-  return config.googleOAuthRedirectTarget ?? config.cognitoRedirectUri ?? config.supportingWebOrigin;
+  return config.supportingWebOrigin ?? config.googleOAuthRedirectTarget ?? config.cognitoRedirectUri;
 }
 
 function mapGoogleOAuthStatusResponse(httpStatus, body) {
@@ -477,6 +494,21 @@ async function safeJson(response) {
 
 function safeErrorMessage(error) {
   return String(error?.message ?? error).replace(/Bearer\s+[^ \n]+/gi, "Bearer [redacted]");
+}
+
+function publicGoogleOAuthRequest(authorizationUrl) {
+  try {
+    const url = new URL(authorizationUrl);
+    return {
+      clientId: url.searchParams.get("client_id") ?? "unavailable",
+      redirectUri: url.searchParams.get("redirect_uri") ?? "unavailable"
+    };
+  } catch {
+    return {
+      clientId: "unavailable",
+      redirectUri: "unavailable"
+    };
+  }
 }
 
 function joinUrl(baseUrl, path) {

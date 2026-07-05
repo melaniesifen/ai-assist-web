@@ -7,6 +7,8 @@ const PRODUCT_SIGN_OUT_BUTTON = document.querySelector("#product-sign-out");
 const GOOGLE_OAUTH_STATUS_ELEMENT = document.querySelector("#google-oauth-status");
 const GOOGLE_CONNECT_BUTTON = document.querySelector("#google-connect");
 const ASSISTANT_APP_FRAME = document.querySelector("#assistant-app");
+const GOOGLE_OAUTH_POLL_INTERVAL_MS = 2000;
+const GOOGLE_OAUTH_POLL_ATTEMPTS = 30;
 
 PRODUCT_SIGN_IN_BUTTON.addEventListener("click", () => runProductAuthAction("AI_ASSIST_PRODUCT_SIGN_IN"));
 PRODUCT_SIGN_OUT_BUTTON.addEventListener("click", () => runProductAuthAction("AI_ASSIST_PRODUCT_SIGN_OUT"));
@@ -83,11 +85,44 @@ async function runGoogleConnectAction() {
 
   if (response.googleOAuth?.status && response.googleOAuth.status !== "connected") {
     GOOGLE_OAUTH_STATUS_ELEMENT.textContent = formatGoogleOAuthStatus(response.googleOAuth);
-    GOOGLE_CONNECT_BUTTON.disabled = false;
+    await pollGoogleOAuthStatus();
     return;
   }
 
   await loadRuntimeContext();
+}
+
+async function pollGoogleOAuthStatus() {
+  for (let attempt = 0; attempt < GOOGLE_OAUTH_POLL_ATTEMPTS; attempt += 1) {
+    await delay(GOOGLE_OAUTH_POLL_INTERVAL_MS);
+    const response = await browser.runtime.sendMessage({ type: "AI_ASSIST_GOOGLE_OAUTH_STATUS" });
+    const googleOAuth = response?.googleOAuth;
+
+    if (!response?.ok || !googleOAuth?.status) {
+      GOOGLE_OAUTH_STATUS_ELEMENT.textContent = response?.error ?? "Unable to refresh Google status.";
+      GOOGLE_CONNECT_BUTTON.disabled = false;
+      return;
+    }
+
+    GOOGLE_OAUTH_STATUS_ELEMENT.textContent = formatGoogleOAuthStatus(googleOAuth);
+    if (googleOAuth.status === "connected") {
+      await loadRuntimeContext();
+      return;
+    }
+    if (!["connecting", "not_connected"].includes(googleOAuth.status)) {
+      GOOGLE_CONNECT_BUTTON.disabled = false;
+      return;
+    }
+  }
+
+  GOOGLE_OAUTH_STATUS_ELEMENT.textContent = "Still waiting for Google connection. Reopen the sidebar to refresh.";
+  GOOGLE_CONNECT_BUTTON.disabled = false;
+}
+
+function delay(milliseconds) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, milliseconds);
+  });
 }
 
 function formatProductAuthStatus(productAuth) {

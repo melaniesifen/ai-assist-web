@@ -209,15 +209,19 @@ async function startGoogleOAuthConnect() {
   }
 
   try {
-    await browser.identity.launchWebAuthFlow({
+    await browser.tabs.create({
       url: body.authorizationUrl,
-      interactive: true
+      active: true
     });
   } catch (error) {
-    googleOAuthState = accessDeniedGoogleState(`Google authorization window failed: ${safeErrorMessage(error)}`);
+    const oauthRequest = publicGoogleOAuthRequest(body.authorizationUrl);
+    googleOAuthState = accessDeniedGoogleState(
+      `Google authorization tab failed: ${safeErrorMessage(error)}. client_id=${oauthRequest.clientId}; redirect_uri=${oauthRequest.redirectUri}`
+    );
     throw new Error(googleOAuthState.message);
   }
-  return readGoogleOAuthStatus(config);
+  googleOAuthState = connectingGoogleState();
+  return googleOAuthState;
 }
 
 async function loadConfigFromStorage() {
@@ -323,7 +327,7 @@ function trimTrailingSlash(value) {
 }
 
 function googleOAuthRedirectTarget(config) {
-  return config.googleOAuthRedirectTarget ?? config.cognitoRedirectUri ?? config.supportingWebOrigin;
+  return config.supportingWebOrigin ?? config.googleOAuthRedirectTarget ?? config.cognitoRedirectUri;
 }
 
 function mapGoogleOAuthStatusResponse(httpStatus, body) {
@@ -415,6 +419,21 @@ async function safeJson(response) {
 
 function safeErrorMessage(error) {
   return String(error?.message ?? error).replace(/Bearer\s+[^ \n]+/gi, "Bearer [redacted]");
+}
+
+function publicGoogleOAuthRequest(authorizationUrl) {
+  try {
+    const url = new URL(authorizationUrl);
+    return {
+      clientId: url.searchParams.get("client_id") ?? "unavailable",
+      redirectUri: url.searchParams.get("redirect_uri") ?? "unavailable"
+    };
+  } catch {
+    return {
+      clientId: "unavailable",
+      redirectUri: "unavailable"
+    };
+  }
 }
 
 function joinUrl(baseUrl, path) {
