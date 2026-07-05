@@ -8,6 +8,7 @@ import firefoxManifest from "../extension/firefox/manifest.json";
 import firefoxConfig from "../extension/firefox/config.example.json";
 import firefoxBackgroundScript from "../extension/firefox/background.js?raw";
 import firefoxContentScript from "../extension/firefox/content-script.js?raw";
+import firefoxBuiltIndex from "../extension/firefox/dist/index.html?raw";
 import firefoxSidebarScript from "../extension/firefox/sidebar.js?raw";
 
 describe("extension package", () => {
@@ -132,5 +133,10 @@ describe("extension package", () => {
     expect(firefoxBackgroundScript).toContain("parseHostedUiRedirect(redirectUrl, expectedState)");
     expect(firefoxBackgroundScript).toContain("errorCode: \"state_mismatch\"");
     expect(firefoxBackgroundScript).toContain("errorCode: \"id_token_required\"");
+  });
+
+  it("builds Firefox iframe assets with relative paths so the sidebar can load them from dist", () => {
+    expect(firefoxBuiltIndex).toContain("./assets/");
+    expect(firefoxBuiltIndex).not.toMatch(/(?:src|href)="\/assets\//);
   });
 });
