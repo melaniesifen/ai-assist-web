@@ -1,4 +1,4 @@
-import { type ReactElement, useMemo, useState } from "react";
+import { type FormEvent, type ReactElement, useMemo, useState } from "react";
 import { describeGoogleDocsExtensionSurface } from "./extension-surface";
 import {
   DEMO_DOCUMENT_URL,
@@ -55,11 +55,32 @@ import {
   safeRealFlowLogExcludesForbiddenContent,
   type RealFlowClientViewModel
 } from "./real-flow-client";
+import {
+  createDogfoodSidebarState,
+  safeDogfoodSidebarLogExcludesForbiddenContent,
+  type DogfoodSidebarBlocker,
+  type DogfoodSidebarContractInput,
+  type DogfoodSidebarState,
+  type GoogleOAuthStatus,
+  type ProductAuthStatus
+} from "./dogfood-sidebar-state";
 
 const EMPTY_CHAT_INPUT = "";
+const DEFAULT_CONTEXT_STATUS: DogfoodSidebarContractInput["context"] = "idle";
+const DEFAULT_PROVIDER_STATUS: DogfoodSidebarContractInput["provider"] = "unknown";
+const DEFAULT_COMMAND_STATUS: DogfoodSidebarContractInput["command"] = "idle";
+const DEFAULT_STREAM_STATUS: DogfoodSidebarContractInput["stream"] = "disconnected";
+const DEFAULT_PROPOSED_ACTIONS_STATUS: DogfoodSidebarContractInput["proposedActions"] = "none";
+const DEFAULT_APPLY_STATUS: DogfoodSidebarContractInput["apply"] = "blocked";
+const QUICK_COMMANDS = ["Summarize this doc", "Suggest edits"] as const;
 
 export function App(): ReactElement {
   const extensionSurface = useMemo(() => describeGoogleDocsExtensionSurface({ url: DEMO_DOCUMENT_URL }), []);
+  const dogfoodInput = useMemo(
+    () => createDogfoodSidebarInputFromSearch(getRuntimeSearch(), null),
+    []
+  );
+  const dogfoodState = useMemo(() => createDogfoodSidebarState(dogfoodInput), [dogfoodInput]);
   const initialShell = useMemo(
     () =>
       createAssistantShellState(
@@ -120,12 +141,17 @@ export function App(): ReactElement {
   }
 
   return (
-    <main className="sidepanel-demo" aria-labelledby="app-title">
+    <main className="dogfood-app" aria-labelledby="app-title">
+      <DogfoodAssistantSurface input={dogfoodInput} state={dogfoodState} />
+
+      <details className="dev-harness-panel">
+        <summary>Development diagnostics and deterministic harnesses</summary>
+        <div className="sidepanel-demo" aria-label="Development-only harness container">
       <section className="document-preview" aria-label="Google Docs content-script bridge preview">
         <header className="document-header">
           <div>
             <p className="eyebrow">Google Docs content-script bridge</p>
-            <h1 id="app-title">{shellState.bridge.title}</h1>
+            <h1 id="dev-harness-title">{shellState.bridge.title}</h1>
           </div>
           <dl className="doc-meta" aria-label="Current document metadata">
             <div>
@@ -630,8 +656,410 @@ export function App(): ReactElement {
           ) : null}
         </aside>
       ) : null}
+        </div>
+      </details>
     </main>
   );
+}
+
+export function DogfoodAssistantSurface({
+  input,
+  state
+}: {
+  input: DogfoodSidebarContractInput;
+  state: DogfoodSidebarState;
+}): ReactElement {
+  const firstBlockingDependency = state.blockers.find((blocker) =>
+    ["auth", "google", "document", "context", "provider", "command"].includes(blocker.area)
+  );
+  const commandPlaceholder = state.canSubmitCommand
+    ? "Ask for a summary or edit suggestions"
+    : firstBlockingDependency?.message ?? "Refresh readiness before submitting";
+
+  return (
+    <section className="dogfood-assistant" aria-label="AI Assist sidebar">
+      <header className="dogfood-header">
+        <div>
+          <p className="eyebrow">AI Assist</p>
+          <h1 id="app-title">Assistant for this document</h1>
+        </div>
+        <span className={`readiness-badge ${state.canSubmitCommand ? "ready" : "blocked"}`}>
+          {state.canSubmitCommand ? "Ready" : "Blocked"}
+        </span>
+      </header>
+
+      <section className="readiness-controls" aria-label="Sidebar readiness controls">
+        <ReadinessControl
+          actionLabel={input.productAuth === "signed_in" ? "Signed in" : "Sign in"}
+          disabled={input.productAuth === "signed_in" || input.productAuth === "signing_in"}
+          label="Product login"
+          status={formatProductAuth(input.productAuth)}
+          tone={input.productAuth === "signed_in" ? "ready" : "blocked"}
+        />
+        <ReadinessControl
+          actionLabel={input.googleOAuth === "reconnect_required" ? "Reconnect" : "Connect"}
+          disabled={input.productAuth !== "signed_in" || input.googleOAuth === "connected" || input.googleOAuth === "connecting"}
+          label="Google"
+          status={formatGoogleOAuth(input.googleOAuth)}
+          tone={input.googleOAuth === "connected" ? "ready" : "blocked"}
+        />
+        <ReadinessControl
+          actionLabel="Refresh"
+          disabled={input.activeDocument.status !== "missing_document_id"}
+          label="Active document"
+          status={state.activeDocumentId ?? formatActiveDocument(input)}
+          tone={state.activeDocumentId ? "ready" : "blocked"}
+        />
+        <ReadinessControl
+          actionLabel="Refresh"
+          disabled={input.productAuth !== "signed_in" || input.googleOAuth !== "connected" || input.context === "ready"}
+          label="Context"
+          status={formatContext(input.context)}
+          tone={input.context === "ready" ? "ready" : "blocked"}
+        />
+        <ReadinessControl
+          actionLabel="Refresh"
+          disabled={input.provider === "ready"}
+          label="Provider"
+          status={formatProvider(input.provider)}
+          tone={input.provider === "ready" ? "ready" : "blocked"}
+        />
+        <ReadinessControl
+          actionLabel={state.canSubmitCommand ? "Ready" : "Blocked"}
+          disabled
+          label="Command"
+          status={formatCommandReadiness(state)}
+          tone={state.canSubmitCommand ? "ready" : "blocked"}
+        />
+      </section>
+
+      <section className="assistant-command" aria-label="Assistant command">
+        <div className="quick-commands" aria-label="Common commands">
+          {QUICK_COMMANDS.map((command) => (
+            <button disabled={!state.canSubmitCommand} key={command} type="button">
+              {command}
+            </button>
+          ))}
+        </div>
+        <form className="assistant-command-form" onSubmit={preventDogfoodCommandSubmit}>
+          <label className="sr-only" htmlFor="dogfood-command-input">Assistant prompt</label>
+          <textarea
+            disabled={!state.canSubmitCommand}
+            id="dogfood-command-input"
+            placeholder={commandPlaceholder}
+            readOnly
+            rows={4}
+          />
+          <button className="primary" disabled={!state.canSubmitCommand} type="submit">
+            Send
+          </button>
+        </form>
+      </section>
+
+      <section className="assistant-status-grid" aria-label="Assistant status">
+        <StatusPanel label="Stream" status={state.streamReadiness} detail={formatStream(input, state)} />
+        <StatusPanel label="Proposed actions" status={formatProposedActions(input)} detail={formatReviewReadiness(state)} />
+        <StatusPanel label="Apply" status={state.applyReadiness} detail={formatApplyReadiness(input, state)} />
+        <StatusPanel
+          label="Safe log"
+          status="metadata only"
+          detail={safeDogfoodSidebarLogExcludesForbiddenContent(state.safeLogEvent) ? "No raw document, prompt, token, provider, or action payload content." : "Blocked by unsafe metadata."}
+        />
+      </section>
+
+      {state.blockers.length > 0 ? (
+        <section className="blocker-list" aria-label="Current blockers">
+          <h2>What is blocking the assistant</h2>
+          {state.blockers.slice(0, 5).map((blocker) => (
+            <BlockerRow blocker={blocker} key={`${blocker.area}-${blocker.code}`} />
+          ))}
+        </section>
+      ) : (
+        <section className="assistant-ready-note" aria-label="Ready state">
+          <h2>Ready for a read-only command</h2>
+          <p>Commands remain backend-owned. The sidebar sends document identity and product auth context, not raw document content.</p>
+        </section>
+      )}
+    </section>
+  );
+}
+
+export function createDogfoodSidebarInputFromSearch(
+  search: string,
+  fallbackDocumentId: string | null
+): DogfoodSidebarContractInput {
+  const params = new URLSearchParams(search.startsWith("?") ? search.slice(1) : search);
+  const documentId = params.get("documentId")?.trim() || fallbackDocumentId;
+  return {
+    productAuth: normalizeProductAuthStatus(params.get("productAuthStatus")),
+    googleOAuth: normalizeGoogleOAuthStatus(params.get("googleOAuthStatus")),
+    activeDocument: documentId
+      ? {
+          status: "detected",
+          documentId
+        }
+      : {
+          status: params.get("activeTabUrl") ? "missing_document_id" : "unsupported_page"
+        },
+    context: normalizeContractStatus(params.get("contextStatus"), DEFAULT_CONTEXT_STATUS, [
+      "idle",
+      "loading",
+      "ready",
+      "consent_required",
+      "permission_denied",
+      "unavailable",
+      "error"
+    ]),
+    provider: normalizeContractStatus(params.get("providerStatus"), DEFAULT_PROVIDER_STATUS, [
+      "unknown",
+      "ready",
+      "missing",
+      "unavailable",
+      "rate_limited",
+      "error"
+    ]),
+    command: normalizeContractStatus(params.get("commandStatus"), DEFAULT_COMMAND_STATUS, [
+      "idle",
+      "ready",
+      "submitting",
+      "accepted",
+      "blocked",
+      "failed"
+    ]),
+    stream: normalizeContractStatus(params.get("streamStatus"), DEFAULT_STREAM_STATUS, [
+      "disconnected",
+      "connecting",
+      "open",
+      "reconnect_required",
+      "closed",
+      "error",
+      "unavailable"
+    ]),
+    proposedActions: normalizeContractStatus(params.get("proposedActionsStatus"), DEFAULT_PROPOSED_ACTIONS_STATUS, [
+      "none",
+      "loading",
+      "ready",
+      "blocked",
+      "error"
+    ]),
+    apply: normalizeContractStatus(params.get("applyStatus"), DEFAULT_APPLY_STATUS, [
+      "blocked",
+      "ready",
+      "applying",
+      "applied",
+      "conflicted",
+      "failed",
+      "uncertain"
+    ]),
+    controlledDocumentWriteApproved: params.get("controlledDocumentWriteApproved") === "true"
+  };
+}
+
+export function preventDogfoodCommandSubmit(event: Pick<FormEvent<HTMLFormElement>, "preventDefault">): void {
+  event.preventDefault();
+}
+
+function ReadinessControl({
+  actionLabel,
+  disabled,
+  label,
+  status,
+  tone
+}: {
+  actionLabel: string;
+  disabled: boolean;
+  label: string;
+  status: string;
+  tone: "ready" | "blocked";
+}): ReactElement {
+  return (
+    <article className={`readiness-control ${tone}`}>
+      <div>
+        <span>{label}</span>
+        <strong>{status}</strong>
+      </div>
+      <button disabled={disabled} type="button">
+        {actionLabel}
+      </button>
+    </article>
+  );
+}
+
+function StatusPanel({ detail, label, status }: { detail: string; label: string; status: string }): ReactElement {
+  return (
+    <article className="assistant-status-panel">
+      <span>{label}</span>
+      <strong>{status}</strong>
+      <p>{detail}</p>
+    </article>
+  );
+}
+
+function BlockerRow({ blocker }: { blocker: DogfoodSidebarBlocker }): ReactElement {
+  return (
+    <article className="blocker-row">
+      <div>
+        <strong>{blocker.code}</strong>
+        <p>{blocker.message}</p>
+      </div>
+      <span>{blocker.retryable ? "Retryable" : "User action"}</span>
+    </article>
+  );
+}
+
+function getRuntimeSearch(): string {
+  if (typeof window === "undefined") {
+    return "";
+  }
+  return window.location.search;
+}
+
+function normalizeProductAuthStatus(rawStatus: string | null): ProductAuthStatus {
+  if (rawStatus === "signed_in" || rawStatus === "signed_out" || rawStatus === "signing_in" || rawStatus === "unknown" || rawStatus === "error") {
+    return rawStatus;
+  }
+  if (rawStatus === "auth_expired" || rawStatus === "expired") {
+    return "expired";
+  }
+  return "signed_out";
+}
+
+function normalizeGoogleOAuthStatus(rawStatus: string | null): GoogleOAuthStatus {
+  if (
+    rawStatus === "unknown" ||
+    rawStatus === "not_connected" ||
+    rawStatus === "connecting" ||
+    rawStatus === "connected" ||
+    rawStatus === "reconnect_required" ||
+    rawStatus === "access_denied" ||
+    rawStatus === "dependency_error"
+  ) {
+    return rawStatus;
+  }
+  if (rawStatus === "auth_expired") {
+    return "reconnect_required";
+  }
+  return "not_connected";
+}
+
+function normalizeContractStatus<T extends string>(rawStatus: string | null, fallback: T, allowed: readonly T[]): T {
+  return allowed.includes(rawStatus as T) ? (rawStatus as T) : fallback;
+}
+
+function formatProductAuth(status: DogfoodSidebarContractInput["productAuth"]): string {
+  const labels: Record<DogfoodSidebarContractInput["productAuth"], string> = {
+    unknown: "Unknown",
+    signed_out: "Signed out",
+    signing_in: "Signing in",
+    signed_in: "Signed in",
+    expired: "Expired",
+    error: "Error"
+  };
+  return labels[status];
+}
+
+function formatGoogleOAuth(status: DogfoodSidebarContractInput["googleOAuth"]): string {
+  const labels: Record<DogfoodSidebarContractInput["googleOAuth"], string> = {
+    unknown: "Unknown",
+    not_connected: "Not connected",
+    connecting: "Connecting",
+    connected: "Connected",
+    reconnect_required: "Reconnect required",
+    access_denied: "Access denied",
+    dependency_error: "Service unavailable"
+  };
+  return labels[status];
+}
+
+function formatActiveDocument(input: DogfoodSidebarContractInput): string {
+  if (input.activeDocument.status === "unsupported_page") {
+    return "Unsupported page";
+  }
+  if (input.activeDocument.status === "missing_document_id") {
+    return "Missing document ID";
+  }
+  return "Detected";
+}
+
+function formatContext(status: DogfoodSidebarContractInput["context"]): string {
+  const labels: Record<DogfoodSidebarContractInput["context"], string> = {
+    idle: "Not loaded",
+    loading: "Loading",
+    ready: "Ready",
+    consent_required: "Consent required",
+    permission_denied: "Permission denied",
+    unavailable: "Unavailable",
+    error: "Error"
+  };
+  return labels[status];
+}
+
+function formatProvider(status: DogfoodSidebarContractInput["provider"]): string {
+  const labels: Record<DogfoodSidebarContractInput["provider"], string> = {
+    unknown: "Unknown",
+    ready: "Ready",
+    missing: "Required",
+    unavailable: "Unavailable",
+    rate_limited: "Rate limited",
+    error: "Error"
+  };
+  return labels[status];
+}
+
+function formatCommandReadiness(state: DogfoodSidebarState): string {
+  if (state.commandReadiness === "in_progress") {
+    return "In progress";
+  }
+  if (state.commandReadiness === "accepted") {
+    return "Accepted";
+  }
+  if (state.commandReadiness === "failed") {
+    return "Failed";
+  }
+  return state.commandReadiness === "ready" ? "Ready" : "Blocked";
+}
+
+function formatStream(input: DogfoodSidebarContractInput, state: DogfoodSidebarState): string {
+  if (state.streamReadiness === "available") {
+    return "Live assistant progress can render when backend events arrive.";
+  }
+  if (state.streamReadiness === "refresh_required") {
+    return "Durable session refresh is required before apply controls can proceed.";
+  }
+  if (input.stream === "unavailable" || input.stream === "error") {
+    return "Streaming is not available from the backend.";
+  }
+  return "Stream opens after command readiness and accepted command state.";
+}
+
+function formatProposedActions(input: DogfoodSidebarContractInput): string {
+  const labels: Record<DogfoodSidebarContractInput["proposedActions"], string> = {
+    none: "None",
+    loading: "Loading",
+    ready: "Ready",
+    blocked: "Blocked",
+    error: "Error"
+  };
+  return labels[input.proposedActions];
+}
+
+function formatReviewReadiness(state: DogfoodSidebarState): string {
+  return state.canReviewProposedActions
+    ? "Backend proposed actions can render as review cards."
+    : "Review cards stay hidden until backend action state is ready.";
+}
+
+function formatApplyReadiness(input: DogfoodSidebarContractInput, state: DogfoodSidebarState): string {
+  if (state.canApplyApprovedAction) {
+    return "Approved actions can be applied with controlled-document approval.";
+  }
+  if (!input.controlledDocumentWriteApproved) {
+    return "Write approval is required before any mutation control is enabled.";
+  }
+  if (state.applyReadiness === "uncertain") {
+    return "Refresh before retrying because mutation state is uncertain.";
+  }
+  return "Apply stays blocked until backend action and stream state are ready.";
 }
 
 function ReadinessScenario({ scenario }: { scenario: GoogleDocsReadinessViewModel }): ReactElement {

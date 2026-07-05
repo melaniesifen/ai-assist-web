@@ -31,7 +31,8 @@ body {
 }
 
 button,
-input {
+input,
+textarea {
   font: inherit;
 }
 
@@ -94,6 +95,188 @@ code {
   max-width: 100%;
   overflow-wrap: anywhere;
   font-size: 0.78rem;
+}
+
+.dogfood-app {
+  min-height: 100vh;
+  padding: 18px;
+  background: var(--bg);
+}
+
+.dogfood-assistant {
+  display: grid;
+  gap: 14px;
+  width: min(900px, 100%);
+  margin: 0 auto;
+}
+
+.dogfood-header,
+.readiness-control,
+.assistant-command-form,
+.blocker-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.dogfood-header {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 18px;
+  background: var(--paper);
+}
+
+.readiness-badge {
+  flex: 0 0 auto;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0.35rem 0.65rem;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.readiness-badge.ready {
+  border-color: #9bd1ab;
+  color: var(--success);
+  background: var(--success-bg);
+}
+
+.readiness-badge.blocked {
+  border-color: #e5b5ad;
+  color: var(--danger);
+  background: var(--danger-bg);
+}
+
+.readiness-controls,
+.assistant-status-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.readiness-control,
+.assistant-command,
+.assistant-status-panel,
+.blocker-list,
+.assistant-ready-note,
+.dev-harness-panel {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper);
+}
+
+.readiness-control {
+  min-width: 0;
+  padding: 12px;
+}
+
+.readiness-control.ready {
+  border-color: #9bd1ab;
+}
+
+.readiness-control.blocked {
+  border-color: #e5b5ad;
+}
+
+.readiness-control div,
+.assistant-status-panel {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.readiness-control span,
+.assistant-status-panel span {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.readiness-control strong,
+.assistant-status-panel strong {
+  overflow-wrap: anywhere;
+}
+
+.readiness-control button {
+  flex: 0 0 auto;
+}
+
+.assistant-command {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+}
+
+.quick-commands {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.assistant-command-form textarea {
+  min-width: 0;
+  flex: 1;
+  resize: vertical;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 0.75rem;
+  color: var(--text);
+  background: var(--surface);
+}
+
+.assistant-command-form textarea:disabled {
+  color: var(--muted);
+  background: var(--surface-strong);
+}
+
+.assistant-status-panel {
+  padding: 12px;
+}
+
+.assistant-status-panel p,
+.blocker-row p,
+.assistant-ready-note p {
+  margin-bottom: 0;
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.blocker-list,
+.assistant-ready-note {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+}
+
+.blocker-row {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 10px;
+  background: var(--surface);
+}
+
+.blocker-row span {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.dev-harness-panel {
+  width: min(900px, 100%);
+  margin: 18px auto 0;
+  overflow: hidden;
+}
+
+.dev-harness-panel > summary {
+  padding: 12px 14px;
+  color: var(--muted);
+  font-size: 0.86rem;
+  font-weight: 800;
+  cursor: pointer;
 }
 
 .sidepanel-demo {
@@ -852,10 +1035,13 @@ dd {
   }
 
   .document-header,
+  .dogfood-header,
   .setup-header,
   .scenario-header,
   .review-toolbar,
-  .chat-form {
+  .chat-form,
+  .assistant-command-form,
+  .blocker-row {
     align-items: stretch;
     flex-direction: column;
   }
@@ -876,7 +1062,9 @@ dd {
   .real-flow-steps,
   .real-flow-step dl,
   .stream-grid,
-  .stream-metadata {
+  .stream-metadata,
+  .readiness-controls,
+  .assistant-status-grid {
     grid-template-columns: 1fr;
   }
 
