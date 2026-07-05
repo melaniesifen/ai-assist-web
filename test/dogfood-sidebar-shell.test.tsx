@@ -1,10 +1,12 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { createDogfoodSidebarState, type DogfoodSidebarContractInput } from "../src/dogfood-sidebar-state";
+import { createInitialSessionStreamClientState, reduceSseFrame, type SessionEventEnvelope } from "../src/session-stream";
 import {
   App,
   createDogfoodSidebarInputFromSearch,
   DogfoodAssistantSurface,
+  DogfoodSessionStatePanel,
   DogfoodCommandResultPanel,
   preventDogfoodCommandSubmit
 } from "../src/App";
@@ -129,4 +131,158 @@ describe("dogfood sidebar shell", () => {
     expect(html).toContain("metadata only");
     expect(html).not.toMatch(/private prompt|document text|doc_connected_123|Bearer|id\.jwt/i);
   });
+
+  it("renders deterministic stream progress, final assistant output, and backend proposed edit cards", () => {
+    const state = createDogfoodSidebarState(CONNECTED_INPUT);
+    const streamState = [
+      createEnvelope("evt-1", 1, "progress", { message: "Reading approved context" }),
+      createEnvelope("evt-2", 2, "assistant.delta", { messageId: "msg-1", delta: "Draft " }),
+      createEnvelope("evt-3", 3, "assistant.final", { messageId: "msg-1", content: "Draft final answer." }),
+      createEnvelope("evt-4", 4, "action.proposed", {
+        actionId: "action_test_backend_001",
+        actionType: "REPLACE_TEXT",
+        resourceRef: { resourceId: "doc_connected_123", displayName: "Controlled test doc" },
+        summary: "Deterministic test proposal from backend-shaped state.",
+        expiresAt: "2026-07-05T00:00:00.000Z"
+      })
+    ].reduce((current, event) => reduceSseFrame(current, { id: event.eventId, data: JSON.stringify(event) }), createInitialSessionStreamClientState());
+    const html = renderToStaticMarkup(
+      <DogfoodAssistantSurface input={CONNECTED_INPUT} initialSessionStreamState={streamState} state={state} />
+    );
+
+    expect(html).toContain("Assistant messages");
+    expect(html).toContain("Reading approved context");
+    expect(html).toContain("Draft final answer.");
+    expect(html).toContain("Proposed edits");
+    expect(html).toContain("action_test_backend_001");
+    expect(html).toContain("Deterministic test proposal from backend-shaped state.");
+    expect(html).toContain("Apply");
+    expect(html).toContain("metadata only");
+  });
+
+  it("keeps apply disabled when controlled-document write approval is missing", () => {
+    const input = {
+      ...CONNECTED_INPUT,
+      controlledDocumentWriteApproved: false
+    };
+    const state = createDogfoodSidebarState(input);
+    const streamState = reduceSseFrame(
+      createInitialSessionStreamClientState(),
+      {
+        id: "evt-approved",
+        data: JSON.stringify(
+          createEnvelope("evt-approved", 1, "action.status_changed", {
+            actionId: "action_test_approved",
+            status: "APPROVED"
+          })
+        )
+      }
+    );
+    const html = renderToStaticMarkup(
+      <DogfoodSessionStatePanel
+        actionResult={null}
+        actionRouteStates={{}}
+        actionSubmitting={null}
+        onRefresh={async () => undefined}
+        onAction={async () => undefined}
+        proposedActions={Object.values(streamState.session.proposedActions)}
+        sidebarState={state}
+        streamRefreshError={null}
+        streamRefreshing={false}
+        streamState={streamState}
+      />
+    );
+
+    expect(html).toContain("action_test_approved");
+    expect(html).toContain("Apply stays disabled until backend readiness and controlled-document approval are present.");
+    expect(html).toMatch(/<button class="primary" disabled="" type="button">Apply<\/button>/);
+  });
+
+  it("keeps action controls disabled when backend session identity is missing", () => {
+    const state = createDogfoodSidebarState(CONNECTED_INPUT);
+    const streamState = reduceSseFrame(
+      createInitialSessionStreamClientState(),
+      {
+        id: "evt-missing-session",
+        data: JSON.stringify({
+          ...createEnvelope("evt-missing-session", 1, "action.proposed", {
+            actionId: "action_missing_session",
+            actionType: "REPLACE_TEXT",
+            summary: "Deterministic proposal without backend session identity."
+          }),
+          sessionId: ""
+        })
+      }
+    );
+    const html = renderToStaticMarkup(
+      <DogfoodSessionStatePanel
+        actionResult={null}
+        actionRouteStates={{}}
+        actionSubmitting={null}
+        onRefresh={async () => undefined}
+        onAction={async () => undefined}
+        proposedActions={Object.values(streamState.session.proposedActions)}
+        sidebarState={state}
+        streamRefreshError={null}
+        streamRefreshing={false}
+        streamState={streamState}
+      />
+    );
+
+    expect(html).toContain("Refresh backend action state before reviewing or applying this action.");
+    expect(html).toMatch(/<button disabled="" type="button">Reject<\/button>/);
+    expect(html).toMatch(/<button disabled="" type="button">Approve<\/button>/);
+    expect(html).toMatch(/<button class="primary" disabled="" type="button">Apply<\/button>/);
+  });
+
+  it("freezes action controls after an accepted route until backend status refresh", () => {
+    const state = createDogfoodSidebarState(CONNECTED_INPUT);
+    const streamState = reduceSseFrame(
+      createInitialSessionStreamClientState(),
+      {
+        id: "evt-proposed",
+        data: JSON.stringify(
+          createEnvelope("evt-proposed", 1, "action.proposed", {
+            actionId: "action_waiting_status",
+            actionType: "REPLACE_TEXT",
+            summary: "Deterministic proposal waiting on backend status."
+          })
+        )
+      }
+    );
+    const html = renderToStaticMarkup(
+      <DogfoodSessionStatePanel
+        actionResult={null}
+        actionRouteStates={{ action_waiting_status: { pendingKind: null, acceptedKind: "approve" } }}
+        actionSubmitting={null}
+        onRefresh={async () => undefined}
+        onAction={async () => undefined}
+        proposedActions={Object.values(streamState.session.proposedActions)}
+        sidebarState={state}
+        streamRefreshError={null}
+        streamRefreshing={false}
+        streamState={streamState}
+      />
+    );
+
+    expect(html).toContain("Waiting for backend status refresh before another action.");
+    expect(html).toMatch(/<button disabled="" type="button">Reject<\/button>/);
+    expect(html).toMatch(/<button disabled="" type="button">Approve<\/button>/);
+    expect(html).toMatch(/<button class="primary" disabled="" type="button">Apply<\/button>/);
+  });
 });
+
+function createEnvelope(eventId: string, sequence: number, type: string, payload: Record<string, unknown>): SessionEventEnvelope {
+  return {
+    eventId,
+    sequence,
+    requestId: "req_test_stream",
+    correlationId: "corr_test_stream",
+    tenantId: "tenant_test",
+    userId: "user_test",
+    sessionId: "session_test",
+    type,
+    payload,
+    createdAt: "2026-07-05T00:00:00.000Z"
+  };
+}

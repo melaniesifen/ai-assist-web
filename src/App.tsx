@@ -45,11 +45,16 @@ import {
   createInitialSessionStreamClientState,
   createLastEventIdHeaders,
   createSessionStreamDemoFrames,
+  fetchSessionStreamRoute,
   getSessionStreamRefreshGuidance,
   reduceSseFrame,
-  safeSessionStreamLogExcludesForbiddenContent
+  safeSessionStreamLogExcludesForbiddenContent,
+  type SessionStreamClientState,
+  type SessionStreamRouteFetch
 } from "./session-stream";
+import { type ProposedActionView } from "./session-events";
 import {
+  createSessionStreamUrl,
   createRealFlowClientStateFromRuntimeEnv,
   createRealFlowClientViewModel,
   safeRealFlowLogExcludesForbiddenContent,
@@ -59,10 +64,18 @@ import {
   createExtensionDogfoodCommandAuthProvider,
   safeDogfoodCommandLogExcludesForbiddenContent,
   submitDogfoodCommand,
+  type DogfoodCommandAuthProvider,
   type DogfoodCommandKind,
   type DogfoodCommandResult
 } from "./dogfood-command-client";
+import {
+  safeDogfoodActionLogExcludesForbiddenContent,
+  submitDogfoodActionRoute,
+  type DogfoodActionRouteKind,
+  type DogfoodActionRouteResult
+} from "./dogfood-action-client";
 import { type ExtensionRuntimeAuthBridge } from "./product-auth";
+import { getProposedActionState } from "./proposed-actions";
 import {
   createDogfoodSidebarState,
   safeDogfoodSidebarLogExcludesForbiddenContent,
@@ -84,6 +97,11 @@ const QUICK_COMMANDS = [
   { kind: "summarize", label: "Summarize this doc", prompt: "Summarize this Google Doc." },
   { kind: "suggest_edits", label: "Suggest edits", prompt: "Suggest edits for this Google Doc." }
 ] as const;
+
+type DogfoodLocalActionRouteState = {
+  pendingKind: DogfoodActionRouteKind | null;
+  acceptedKind: DogfoodActionRouteKind | null;
+};
 
 export function App(): ReactElement {
   const extensionSurface = useMemo(() => describeGoogleDocsExtensionSurface({ url: DEMO_DOCUMENT_URL }), []);
@@ -674,19 +692,34 @@ export function App(): ReactElement {
 }
 
 export function DogfoodAssistantSurface({
+  authProvider,
+  initialSessionStreamState,
   input,
-  state
+  state,
+  streamRouteFetcher
 }: {
+  authProvider?: DogfoodCommandAuthProvider;
+  initialSessionStreamState?: SessionStreamClientState;
   input: DogfoodSidebarContractInput;
   state: DogfoodSidebarState;
+  streamRouteFetcher?: SessionStreamRouteFetch;
 }): ReactElement {
   const [commandPrompt, setCommandPrompt] = useState("");
   const [commandKind, setCommandKind] = useState<DogfoodCommandKind>("custom");
   const [commandResult, setCommandResult] = useState<DogfoodCommandResult | null>(null);
+  const [actionResult, setActionResult] = useState<DogfoodActionRouteResult | null>(null);
+  const [dogfoodStreamState, setDogfoodStreamState] = useState<SessionStreamClientState>(
+    initialSessionStreamState ?? createInitialSessionStreamClientState
+  );
   const [submitting, setSubmitting] = useState(false);
+  const [actionSubmitting, setActionSubmitting] = useState<string | null>(null);
+  const [streamRefreshing, setStreamRefreshing] = useState(false);
+  const [streamRefreshError, setStreamRefreshError] = useState<string | null>(null);
+  const [actionRouteStates, setActionRouteStates] = useState<Record<string, DogfoodLocalActionRouteState>>({});
   const firstBlockingDependency = state.blockers.find((blocker) =>
     ["auth", "google", "document", "context", "provider", "command"].includes(blocker.area)
   );
+  const proposedActions = Object.values(dogfoodStreamState.session.proposedActions);
   const canSubmit = state.canSubmitCommand && !submitting;
   const commandPlaceholder = state.canSubmitCommand
     ? "Ask for a summary or edit suggestions"
@@ -697,7 +730,6 @@ export function DogfoodAssistantSurface({
     setSubmitting(true);
     setCommandResult(null);
 
-    const authRuntime = getExtensionRuntimeAuthBridge();
     try {
       const result = await submitDogfoodCommand(
         {
@@ -710,16 +742,84 @@ export function DogfoodAssistantSurface({
           commandPathTemplate: getRuntimeEnvValue("VITE_COMMAND_CREATE_PATH", "/resource-sessions/{sessionId}/commands")
         },
         {
-          authProvider: authRuntime
-            ? createExtensionDogfoodCommandAuthProvider(authRuntime)
-            : async () => {
-                throw new Error("Extension product auth runtime is required.");
-              }
+          authProvider: authProvider ?? createRuntimeDogfoodAuthProvider()
         }
       );
       setCommandResult(result);
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function submitActionRoute(kind: DogfoodActionRouteKind, action: ProposedActionView): Promise<void> {
+    setActionSubmitting(`${kind}:${action.actionId}`);
+    setActionResult(null);
+    setActionRouteStates((current) => ({
+      ...current,
+      [action.actionId]: {
+        pendingKind: kind,
+        acceptedKind: current[action.actionId]?.acceptedKind ?? null
+      }
+    }));
+
+    try {
+      const result = await submitDogfoodActionRoute(
+        {
+          kind,
+          httpBaseUrl: getRuntimeEnvValue("VITE_API_BASE_URL", "http://localhost:8787"),
+          sessionId: action.sessionId ?? "",
+          actionId: action.actionId,
+          actionStatus: action.status,
+          sidebarState: state,
+          decisionPathTemplate: getRuntimeEnvValue("VITE_ACTION_DECISION_PATH", "/resource-sessions/{sessionId}/actions/{actionId}/{decision}"),
+          applyPathTemplate: getRuntimeEnvValue("VITE_ACTION_APPLY_PATH", "/resource-sessions/{sessionId}/apply-action")
+        },
+        {
+          authProvider: authProvider ?? createRuntimeDogfoodAuthProvider()
+        }
+      );
+      setActionResult(result);
+      setActionRouteStates((current) => ({
+        ...current,
+        [action.actionId]: {
+          pendingKind: null,
+          acceptedKind: result.status === "accepted" ? kind : current[action.actionId]?.acceptedKind ?? null
+        }
+      }));
+    } finally {
+      setActionSubmitting(null);
+      setActionRouteStates((current) => ({
+        ...current,
+        [action.actionId]: {
+          pendingKind: null,
+          acceptedKind: current[action.actionId]?.acceptedKind ?? null
+        }
+      }));
+    }
+  }
+
+  async function refreshSessionState(): Promise<void> {
+    setStreamRefreshing(true);
+    setStreamRefreshError(null);
+    try {
+      const authorization = await (authProvider ?? createRuntimeDogfoodAuthProvider())();
+      const fetcher = createAuthorizedStreamFetcher(authorization, streamRouteFetcher);
+      const result = await fetchSessionStreamRoute({
+        streamUrl: createSessionStreamUrl(
+          getRuntimeEnvValue("VITE_SSE_BASE_URL", getRuntimeEnvValue("VITE_API_BASE_URL", "http://localhost:8787")),
+          getRuntimeEnvValue("VITE_SESSION_STREAM_PATH", "/sessions/{sessionId}/events"),
+          getRuntimeEnvValue("VITE_DEMO_SESSION_ID", "session_dogfood_sidebar")
+        ),
+        lastEventId: dogfoodStreamState.lastEventId,
+        initialState: dogfoodStreamState,
+        fetcher,
+        onState: setDogfoodStreamState
+      });
+      setDogfoodStreamState(result.state);
+    } catch {
+      setStreamRefreshError("Session stream refresh is unavailable from this browser session.");
+    } finally {
+      setStreamRefreshing(false);
     }
   }
 
@@ -816,6 +916,19 @@ export function DogfoodAssistantSurface({
         {commandResult ? <DogfoodCommandResultPanel result={commandResult} /> : null}
       </section>
 
+      <DogfoodSessionStatePanel
+        actionResult={actionResult}
+        actionSubmitting={actionSubmitting}
+        actionRouteStates={actionRouteStates}
+        onAction={submitActionRoute}
+        proposedActions={proposedActions}
+        onRefresh={refreshSessionState}
+        sidebarState={state}
+        streamRefreshError={streamRefreshError}
+        streamRefreshing={streamRefreshing}
+        streamState={dogfoodStreamState}
+      />
+
       <section className="assistant-status-grid" aria-label="Assistant status">
         <StatusPanel label="Stream" status={state.streamReadiness} detail={formatStream(input, state)} />
         <StatusPanel label="Proposed actions" status={formatProposedActions(input)} detail={formatReviewReadiness(state)} />
@@ -841,6 +954,195 @@ export function DogfoodAssistantSurface({
         </section>
       )}
     </section>
+  );
+}
+
+export function DogfoodSessionStatePanel({
+  actionResult,
+  actionRouteStates,
+  actionSubmitting,
+  onRefresh,
+  onAction,
+  proposedActions,
+  sidebarState,
+  streamRefreshError,
+  streamRefreshing,
+  streamState
+}: {
+  actionResult: DogfoodActionRouteResult | null;
+  actionRouteStates: Record<string, DogfoodLocalActionRouteState>;
+  actionSubmitting: string | null;
+  onRefresh: () => Promise<void>;
+  onAction: (kind: DogfoodActionRouteKind, action: ProposedActionView) => Promise<void>;
+  proposedActions: ProposedActionView[];
+  sidebarState: DogfoodSidebarState;
+  streamRefreshError: string | null;
+  streamRefreshing: boolean;
+  streamState: SessionStreamClientState;
+}): ReactElement {
+  return (
+    <section className="dogfood-session-state" aria-label="Assistant stream and proposed actions">
+      <article className="assistant-stream-panel">
+        <header>
+          <h2>Assistant messages</h2>
+          <span>{streamRefreshing ? "Refreshing" : streamState.reconnectRequired ? "Refresh required" : streamState.session.connection}</span>
+        </header>
+        <button disabled={!sidebarState.canOpenStream || streamRefreshing} onClick={() => void onRefresh()} type="button">
+          {streamRefreshing ? "Refreshing stream" : "Refresh stream"}
+        </button>
+        {streamState.session.progress.length > 0 ? (
+          <ul className="stream-list" aria-label="Assistant progress">
+            {streamState.session.progress.map((progress) => (
+              <li key={progress.eventId ?? progress.message}>{progress.message}</li>
+            ))}
+          </ul>
+        ) : null}
+        <div className="message-list">
+          {streamState.session.messages.length === 0 ? (
+            <p className="empty-state">Assistant output will appear here when SSE or durable session state is available.</p>
+          ) : (
+            streamState.session.messages.map((message) => (
+              <p className={`message ${message.role}`} key={message.messageId}>
+                <span>{message.status === "FINAL" ? "Final" : "Streaming"}</span>
+                {message.content}
+              </p>
+            ))
+          )}
+        </div>
+        {streamState.reconnectRequired ? (
+          <p className="stream-warning" role="status">
+            Refresh durable session state before applying changes.
+          </p>
+        ) : null}
+        {streamRefreshError ? (
+          <p className="stream-error" role="status">
+            {streamRefreshError}
+          </p>
+        ) : null}
+      </article>
+
+      <article className="assistant-action-panel">
+        <header>
+          <h2>Proposed edits</h2>
+          <span>{proposedActions.length === 0 ? "No backend actions" : `${proposedActions.length} backend action${proposedActions.length === 1 ? "" : "s"}`}</span>
+        </header>
+        {proposedActions.length === 0 ? (
+          <p className="empty-state">Review cards stay hidden until backend action state is ready.</p>
+        ) : (
+          <div className="dogfood-review-list">
+            {proposedActions.map((action) => (
+              <DogfoodActionReviewCard
+                action={action}
+                actionRouteState={actionRouteStates[action.actionId] ?? { pendingKind: null, acceptedKind: null }}
+                actionSubmitting={actionSubmitting}
+                key={action.actionId}
+                onAction={onAction}
+                sidebarState={sidebarState}
+              />
+            ))}
+          </div>
+        )}
+        {actionResult ? <DogfoodActionResultPanel result={actionResult} /> : null}
+      </article>
+
+      <article className="assistant-status-panel">
+        <span>Stream log</span>
+        <strong>{safeSessionStreamLogExcludesForbiddenContent(streamState.safeLogEvent) ? "metadata only" : "blocked"}</strong>
+        <p>No prompt, document, model-output body, token, provider key, or action payload is recorded in the stream log event.</p>
+      </article>
+    </section>
+  );
+}
+
+export function DogfoodActionReviewCard({
+  action,
+  actionRouteState,
+  actionSubmitting,
+  onAction,
+  sidebarState
+}: {
+  action: ProposedActionView;
+  actionRouteState: DogfoodLocalActionRouteState;
+  actionSubmitting: string | null;
+  onAction: (kind: DogfoodActionRouteKind, action: ProposedActionView) => Promise<void>;
+  sidebarState: DogfoodSidebarState;
+}): ReactElement {
+  const actionState = getProposedActionState(action);
+  const approveSubmitting = actionSubmitting === `approve:${action.actionId}`;
+  const rejectSubmitting = actionSubmitting === `reject:${action.actionId}`;
+  const applySubmitting = actionSubmitting === `apply:${action.actionId}`;
+  const awaitingBackendStatus = isAcceptedActionRouteAwaitingStatus(actionRouteState, action);
+  const hasBackendSession = Boolean(action.sessionId?.trim());
+  const actionBusy = Boolean(actionSubmitting) || actionRouteState.pendingKind !== null || awaitingBackendStatus;
+  const canApprove = hasBackendSession && sidebarState.canReviewProposedActions && actionState.canApprove && !actionBusy;
+  const canReject = hasBackendSession && sidebarState.canReviewProposedActions && actionState.canReject && !actionBusy;
+  const canApply = hasBackendSession && sidebarState.canApplyApprovedAction && actionState.canApply && !actionBusy;
+
+  return (
+    <article className={`dogfood-review-card ${action.status.toLowerCase()}`}>
+      <header>
+        <div>
+          <p className="action-id">{action.actionId}</p>
+          <h3>{formatActionType(action.actionType)}</h3>
+        </div>
+        <span className="status-badge">{actionState.label}</span>
+      </header>
+      <p>{action.preview ?? "Backend proposed an edit without exposing a decrypted payload preview."}</p>
+      <dl className="review-details">
+        <div>
+          <dt>Resource</dt>
+          <dd>{action.resourceTitle ?? action.resourceId ?? "Backend-owned resource"}</dd>
+        </div>
+        <div>
+          <dt>Apply gate</dt>
+          <dd>{formatActionGate(sidebarState, action, canApply, awaitingBackendStatus)}</dd>
+        </div>
+      </dl>
+      <div className="card-actions">
+        <button disabled={!canReject} onClick={() => void onAction("reject", action)} type="button">
+          {rejectSubmitting ? "Rejecting" : "Reject"}
+        </button>
+        <button disabled={!canApprove} onClick={() => void onAction("approve", action)} type="button">
+          {approveSubmitting ? "Approving" : "Approve"}
+        </button>
+        <button className="primary" disabled={!canApply} onClick={() => void onAction("apply", action)} type="button">
+          {applySubmitting ? "Applying" : "Apply"}
+        </button>
+      </div>
+    </article>
+  );
+}
+
+export function DogfoodActionResultPanel({ result }: { result: DogfoodActionRouteResult }): ReactElement {
+  return (
+    <article className={`command-result ${result.status}`} aria-live="polite">
+      <header>
+        <div>
+          <span>{result.status.replace(/_/g, " ")}</span>
+          <strong>{result.title}</strong>
+        </div>
+        <span>{result.retryable ? "Retryable" : "No retry"}</span>
+      </header>
+      <p>{result.message}</p>
+      <dl className="command-result-metadata">
+        <div>
+          <dt>Route</dt>
+          <dd>{result.route}</dd>
+        </div>
+        <div>
+          <dt>Action</dt>
+          <dd>{result.actionId}</dd>
+        </div>
+        <div>
+          <dt>Error</dt>
+          <dd>{result.errorCode ?? "None"}</dd>
+        </div>
+        <div>
+          <dt>Safe log</dt>
+          <dd>{safeDogfoodActionLogExcludesForbiddenContent(result.safeLogEvent) ? "metadata only" : "blocked"}</dd>
+        </div>
+      </dl>
+    </article>
   );
 }
 
@@ -1194,6 +1496,85 @@ function formatApplyReadiness(input: DogfoodSidebarContractInput, state: Dogfood
     return "Refresh before retrying because mutation state is uncertain.";
   }
   return "Apply stays blocked until backend action and stream state are ready.";
+}
+
+function formatActionType(actionType: string | null | undefined): string {
+  if (actionType === "INSERT_TEXT") {
+    return "Insert text";
+  }
+  if (actionType === "REPLACE_TEXT") {
+    return "Replace text";
+  }
+  return "Backend proposed edit";
+}
+
+function formatActionGate(
+  state: DogfoodSidebarState,
+  action: ProposedActionView,
+  canApply: boolean,
+  awaitingBackendStatus: boolean
+): string {
+  if (!action.sessionId?.trim()) {
+    return "Refresh backend action state before reviewing or applying this action.";
+  }
+  if (awaitingBackendStatus) {
+    return "Waiting for backend status refresh before another action.";
+  }
+  return formatApplyGate(state, action.status, canApply);
+}
+
+function formatApplyGate(state: DogfoodSidebarState, actionStatus: string, canApply = false): string {
+  if (canApply) {
+    return "Ready";
+  }
+  if (actionStatus !== "APPROVED") {
+    return "Approve the action before apply.";
+  }
+  if (!state.canApplyApprovedAction) {
+    return "Apply stays disabled until backend readiness and controlled-document approval are present.";
+  }
+  return "Ready";
+}
+
+function isAcceptedActionRouteAwaitingStatus(
+  routeState: DogfoodLocalActionRouteState,
+  action: ProposedActionView
+): boolean {
+  if (routeState.acceptedKind === "approve") {
+    return action.status === "PROPOSED";
+  }
+  if (routeState.acceptedKind === "reject") {
+    return action.status !== "REJECTED";
+  }
+  if (routeState.acceptedKind === "apply") {
+    return action.status === "APPROVED";
+  }
+  return false;
+}
+
+function createRuntimeDogfoodAuthProvider(): DogfoodCommandAuthProvider {
+  const authRuntime = getExtensionRuntimeAuthBridge();
+  return authRuntime
+    ? createExtensionDogfoodCommandAuthProvider(authRuntime)
+    : async () => {
+        throw new Error("Extension product auth runtime is required.");
+      };
+}
+
+function createAuthorizedStreamFetcher(
+  authorization: string,
+  fetcher: SessionStreamRouteFetch | undefined
+): SessionStreamRouteFetch {
+  const routeFetch = fetcher ?? ((streamUrl, init) => fetch(streamUrl, init));
+
+  return (streamUrl, init) =>
+    routeFetch(streamUrl, {
+      ...init,
+      headers: {
+        ...init.headers,
+        Authorization: authorization
+      }
+    });
 }
 
 function ReadinessScenario({ scenario }: { scenario: GoogleDocsReadinessViewModel }): ReactElement {

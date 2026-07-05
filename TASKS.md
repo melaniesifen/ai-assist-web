@@ -187,11 +187,19 @@ Relevant design sources: frontend, provider-key, command, SSE, context, proposed
   text in browser logs.
 - [x] M12-T3.3: Render backend accepted, blocked, retryable, and dependency
   responses with safe, actionable messages.
-- [ ] M12-T4.1: Wire SSE or durable refresh state into the sidebar message list.
-- [ ] M12-T4.3: Render backend proposed actions as review cards with
+- [x] M12-T4.1: Wire SSE or durable refresh state into the sidebar message list.
+- [x] M12-T4.2: Render assistant progress, deltas, and final messages from
+  backend-shaped session event state in the primary sidebar surface.
+- [x] M12-T4.3: Render backend proposed actions as review cards with
   approve/reject/apply controls tied to backend action routes.
+- [x] M12-T4.4: Keep apply controls disabled unless backend action state,
+  stream/durable refresh state, and controlled-document write approval make
+  mutation safe.
 - [x] M12-T5.1: Run frontend tests and extension builds for the implemented M12
   UI slice.
+- [x] M12-T5.2: Add deterministic fake-backed command/stream/review tests for
+  assistant output, proposed actions, blocked apply, backend action routes, and
+  safe logging.
 
 ## E2E-Owned UI Validation
 

@@ -35,6 +35,7 @@ export type StreamWarning = {
 
 export type ProposedActionView = {
   actionId: string;
+  sessionId?: string | null;
   actionType?: string | null;
   resourceId?: string | null;
   resourceTitle?: string | null;
@@ -60,6 +61,7 @@ export type SessionState = {
 type SessionEvent = {
   eventId?: string;
   sequence?: number;
+  sessionId?: string;
   type?: string;
   payload?: SessionEventPayload;
   message?: string;
@@ -188,13 +190,14 @@ export function reduceSessionEvent(state: SessionState | undefined, event: Sessi
       break;
     case SESSION_EVENT_TYPES.ACTION_PROPOSED:
       if (normalizedEvent.action?.actionId) {
-        next.proposedActions[normalizedEvent.action.actionId] = toSafeProposedActionView(normalizedEvent.action);
+        next.proposedActions[normalizedEvent.action.actionId] = toSafeProposedActionView(normalizedEvent.action, normalizedEvent.sessionId);
       }
       break;
     case SESSION_EVENT_TYPES.ACTION_STATUS_CHANGED:
       if (normalizedEvent.actionId && ACTION_STATUS_VALUES.has(normalizedEvent.status ?? "")) {
         next.proposedActions[normalizedEvent.actionId] = {
           ...(next.proposedActions[normalizedEvent.actionId] ?? { actionId: normalizedEvent.actionId }),
+          sessionId: normalizedEvent.sessionId ?? next.proposedActions[normalizedEvent.actionId]?.sessionId ?? null,
           status: normalizedEvent.status as ProposedActionStatus,
           updatedAt: normalizedEvent.createdAt ?? null
         };
@@ -272,9 +275,10 @@ function appendProcessedEventId(processedEventIds: readonly string[], eventId: s
   return [...processedEventIds, eventId].slice(-MAX_PROCESSED_EVENT_IDS);
 }
 
-function toSafeProposedActionView(action: UnsafeProposedAction): ProposedActionView {
+function toSafeProposedActionView(action: UnsafeProposedAction, sessionId: string | undefined): ProposedActionView {
   return {
     actionId: action.actionId as string,
+    sessionId: sessionId ?? null,
     actionType: action.actionType ?? null,
     resourceId: action.resourceId ?? action.resourceRef?.resourceId ?? null,
     resourceTitle: action.resourceTitle ?? action.resourceRef?.displayName ?? action.resourceRef?.resourceId ?? null,

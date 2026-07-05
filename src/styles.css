@@ -209,6 +209,78 @@ code {
   padding: 14px;
 }
 
+.dogfood-session-state {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+}
+
+.assistant-stream-panel,
+.assistant-action-panel {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 14px;
+  background: var(--paper);
+}
+
+.assistant-stream-panel header,
+.assistant-action-panel header,
+.dogfood-review-card header {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.assistant-stream-panel header span,
+.assistant-action-panel header span {
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.dogfood-review-list {
+  display: grid;
+  gap: 10px;
+}
+
+.dogfood-review-card {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+  background: var(--surface);
+}
+
+.dogfood-review-card.approved {
+  border-color: #9bd1ab;
+  background: var(--success-bg);
+}
+
+.dogfood-review-card.conflicted {
+  border-color: #e6c76d;
+  background: #fffdf4;
+}
+
+.dogfood-review-card.failed,
+.dogfood-review-card.expired {
+  border-color: #e5b5ad;
+  background: var(--danger-bg);
+}
+
+.dogfood-review-card p {
+  margin-bottom: 0;
+  overflow-wrap: anywhere;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
 .quick-commands {
   display: flex;
   flex-wrap: wrap;
@@ -1123,7 +1195,8 @@ dd {
   .stream-grid,
   .stream-metadata,
   .readiness-controls,
-  .assistant-status-grid {
+  .assistant-status-grid,
+  .dogfood-session-state {
     grid-template-columns: 1fr;
   }
 

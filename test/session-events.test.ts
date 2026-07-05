@@ -135,6 +135,7 @@ describe("session event reducer", () => {
 
     expect(state.proposedActions["action-1"]).toEqual({
       actionId: "action-1",
+      sessionId: null,
       status: "APPROVED",
       updatedAt: "2026-05-30T00:00:00.000Z"
     });
@@ -157,6 +158,7 @@ describe("session event reducer", () => {
 
     expect(state.proposedActions["action-1"]).toEqual({
       actionId: "action-1",
+      sessionId: null,
       actionType: "REPLACE_TEXT",
       resourceId: "doc-1",
       resourceTitle: "Draft",
@@ -166,6 +168,29 @@ describe("session event reducer", () => {
       status: "PROPOSED"
     });
     expect(Object.hasOwn(state.proposedActions["action-1"], "payload")).toBe(false);
+  });
+
+  it("carries backend session identity onto proposed action views", () => {
+    let state = createInitialSessionState();
+    state = reduceSessionEvent(state, {
+      eventId: "evt-1",
+      sessionId: "session_from_backend",
+      type: "action.proposed",
+      action: { actionId: "action-1", actionType: "REPLACE_TEXT" }
+    });
+    state = reduceSessionEvent(state, {
+      eventId: "evt-2",
+      sessionId: "session_from_backend",
+      type: "action.status_changed",
+      actionId: "action-1",
+      status: "APPROVED"
+    });
+
+    expect(state.proposedActions["action-1"]).toMatchObject({
+      actionId: "action-1",
+      sessionId: "session_from_backend",
+      status: "APPROVED"
+    });
   });
 
   it("ignores invalid action status events without mutating action state", () => {
@@ -281,6 +306,7 @@ describe("session event reducer", () => {
 
     expect(state.proposedActions["action_proposed_action_demo"]).toEqual({
       actionId: "action_proposed_action_demo",
+      sessionId: "session_proposed_action_demo",
       actionType: "REPLACE_TEXT",
       resourceId: "resource_proposed_action_demo",
       resourceTitle: "Fixture proposal document",
