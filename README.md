@@ -299,6 +299,40 @@ parameters. Its safe log event records route/status/request metadata and input
 length only; it does not log raw prompt text, document text, document IDs,
 model output, tokens, provider keys, or action payloads.
 
+`src/dogfood-action-client.ts` owns approve, reject, and apply route helpers for
+backend-shaped proposed-action controls. Approve/reject calls send only action
+decision metadata. Apply sends an idempotency key and remains blocked before
+auth/fetch when controlled-document write approval, backend session identity,
+stream refresh state, action status, or apply readiness is unsafe.
+
+### M12 Manual QA Closeout
+
+Local deterministic closeout for M12 passed on 2026-07-04:
+
+- `npm test -- dogfood-command-client dogfood-action-client dogfood-sidebar-shell session-events session-stream`
+  passed with 53 tests.
+- `npm test` passed with 169 tests.
+- `npm run build` passed.
+- `npm run build:extension:firefox:dev` passed.
+
+These checks prove the local sidebar contract, fake-backed command submission,
+stream rendering, proposed-action review controls, blocked apply behavior,
+metadata-only client log assertions, and Firefox extension build path. They do
+not prove live product login, Google OAuth, Google Docs reads/writes, provider
+calls, deployed SSE, deployed proposed-action storage, deployed manual QA, or
+controlled-document mutation.
+
+For approved deployed manual QA, load the Firefox extension from
+`extension/firefox/manifest.json` after rebuilding with ignored deployed config.
+Verify product auth, Google OAuth, active document detection, context/provider
+readiness, command submission, stream/proposed-action state, apply gating, and
+safe-log status. Do not run live OAuth, provider calls, Google Docs reads or
+writes, deployed manual QA, or apply/write checks unless the active session has
+explicit approval for those actions. M13 BYO provider-key setup remains
+separate; M12 may show provider/BYO blocked states, but it does not complete BYO
+provider-key storage, validation, spend isolation, or controlled BYO provider
+smoke.
+
 Existing deterministic panels remain useful for development coverage, but they
 must not be the dogfood default:
 

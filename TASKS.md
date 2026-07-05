@@ -200,6 +200,12 @@ Relevant design sources: frontend, provider-key, command, SSE, context, proposed
 - [x] M12-T5.2: Add deterministic fake-backed command/stream/review tests for
   assistant output, proposed actions, blocked apply, backend action routes, and
   safe logging.
+- [ ] M12-T5.3: Run approved deployed manual QA through product login, Google
+  OAuth, active doc detection, prompt submission, and expected blocked/provider
+  states. Not run in Codex 5 because live OAuth, Google Docs, provider, deployed
+  manual QA, and write/apply actions require explicit approval.
+- [x] M12-T5.4: Reconcile local closeout evidence and update M12/dogfood
+  readiness docs from deterministic checks only.
 
 ## E2E-Owned UI Validation
 
