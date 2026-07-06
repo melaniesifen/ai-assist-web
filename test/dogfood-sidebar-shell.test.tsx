@@ -4,8 +4,10 @@ import { createDogfoodSidebarState, type DogfoodSidebarContractInput } from "../
 import { createInitialSessionStreamClientState, reduceSseFrame, type SessionEventEnvelope } from "../src/session-stream";
 import {
   App,
+  canAutoOpenDogfoodSessionStream,
   createDogfoodSidebarInputFromSearch,
   DogfoodAssistantSurface,
+  DogfoodContextConsentDebugPanel,
   DogfoodSessionStatePanel,
   DogfoodCommandResultPanel,
   getRuntimeSearchValue,
@@ -39,7 +41,7 @@ describe("dogfood sidebar shell", () => {
     expect(html).toContain("Reconnect stream");
     expect(html).toContain("Chat");
     expect(html).toContain("Summarize this doc");
-    expect(html).toContain("Ask a question about this Google Doc.");
+    expect(html).not.toContain("Ask a question about this Google Doc.");
     expect(html).not.toContain("Product login");
     expect(html).not.toContain("Google</span>");
     expect(html).not.toContain("Mocked assistant chat");
@@ -86,6 +88,74 @@ describe("dogfood sidebar shell", () => {
     expect(state.canSubmitCommand).toBe(true);
     expect(state.activeDocumentId).toBe("doc_connected_123");
     expect(state.blockers.map((blocker) => blocker.area)).toEqual(["apply", "apply"]);
+  });
+
+  it("does not auto-open the session stream before the backend accepts a command", () => {
+    const state = createDogfoodSidebarState(CONNECTED_INPUT);
+
+    expect(state.canOpenStream).toBe(true);
+    expect(canAutoOpenDogfoodSessionStream(state, null)).toBe(false);
+    expect(
+      canAutoOpenDogfoodSessionStream(state, {
+        status: "blocked",
+        title: "Command blocked",
+        message: "Provider access is required before submitting a command.",
+        retryable: true,
+        route: "/resource-sessions/session_001/commands",
+        requestId: null,
+        correlationId: null,
+        commandId: null,
+        errorCode: "PROVIDER_REQUIRED",
+        safeLogEvent: {
+          event: "dogfood-command-submission",
+          commandKind: "summarize",
+          routeTemplate: "/resource-sessions/{sessionId}/commands",
+          route: "/resource-sessions/session_001/commands",
+          hasActiveDocument: true,
+          inputLength: 24,
+          resultStatus: "blocked",
+          httpStatus: null,
+          requestId: null,
+          correlationId: null,
+          commandIdPresent: false,
+          errorCode: "PROVIDER_REQUIRED",
+          blockerCodes: []
+        }
+      })
+    ).toBe(false);
+  });
+
+  it("auto-opens the session stream after a backend command is accepted", () => {
+    const state = createDogfoodSidebarState(CONNECTED_INPUT);
+
+    expect(
+      canAutoOpenDogfoodSessionStream(state, {
+        status: "accepted",
+        title: "Command accepted",
+        message: "Assistant command was accepted by the backend.",
+        retryable: false,
+        route: "/resource-sessions/session_001/commands",
+        requestId: "request_001",
+        correlationId: "correlation_001",
+        commandId: "command_001",
+        errorCode: null,
+        safeLogEvent: {
+          event: "dogfood-command-submission",
+          commandKind: "summarize",
+          routeTemplate: "/resource-sessions/{sessionId}/commands",
+          route: "/resource-sessions/session_001/commands",
+          hasActiveDocument: true,
+          inputLength: 24,
+          resultStatus: "accepted",
+          httpStatus: 202,
+          requestId: "request_001",
+          correlationId: "correlation_001",
+          commandIdPresent: true,
+          errorCode: null,
+          blockerCodes: []
+        }
+      })
+    ).toBe(true);
   });
 
   it("keeps chat blocked and exposes context preparation when OAuth is complete but consent is not ready", () => {
@@ -181,7 +251,43 @@ describe("dogfood sidebar shell", () => {
     expect(html).not.toMatch(/private prompt|document text|doc_connected_123|Bearer|id\.jwt/i);
   });
 
-  it("renders deterministic stream progress, final assistant output, and backend proposed edit cards", () => {
+  it("keeps context consent result details in a collapsed debug panel", () => {
+    const html = renderToStaticMarkup(
+      <DogfoodContextConsentDebugPanel
+        result={{
+          status: "granted",
+          message: "Document context access is ready.",
+          retryable: false,
+          route: "/resource-sessions/session_001/context-consent",
+          grantId: "grant_001",
+          errorCode: null,
+          safeLogEvent: {
+            event: "dogfood-context-consent",
+            routeTemplate: "/resource-sessions/{sessionId}/context-consent",
+            route: "/resource-sessions/session_001/context-consent",
+            hasActiveDocument: true,
+            resultStatus: "granted",
+            httpStatus: 200,
+            grantIdPresent: true,
+            errorCode: null
+          }
+        }}
+        streamState={createInitialSessionStreamClientState()}
+      />
+    );
+
+    expect(html).toContain("<summary>Debug</summary>");
+    expect(html).toContain("aria-label=\"Debug details\"");
+    expect(html).toContain("Context consent");
+    expect(html).toContain("Document context access is ready.");
+    expect(html).toContain("Consent log");
+    expect(html).toContain("Stream log");
+    expect(html).toContain("No prompt, document, model-output body, token, provider key, or action payload is recorded in the stream log event.");
+    expect(html).toContain("metadata only");
+    expect(html).not.toContain("<details class=\"dogfood-debug-panel\" open=\"\"");
+  });
+
+  it("renders final assistant output without stale progress and backend proposed edit cards", () => {
     const state = createDogfoodSidebarState(CONNECTED_INPUT);
     const streamState = [
       createEnvelope("evt-1", 1, "progress", { message: "Reading approved context" }),
@@ -200,13 +306,37 @@ describe("dogfood sidebar shell", () => {
     );
 
     expect(html).toContain("Chat");
-    expect(html).toContain("Reading approved context");
+    expect(html).not.toContain("Reading approved context");
     expect(html).toContain("Draft final answer.");
     expect(html).toContain("Suggested edits");
     expect(html).toContain("action_test_backend_001");
     expect(html).toContain("Deterministic test proposal from backend-shaped state.");
     expect(html).toContain("Apply");
+    expect(html).toContain("<summary>Debug</summary>");
+    expect(html).toContain("Stream log");
     expect(html).toContain("metadata only");
+  });
+
+  it("omits stream log from the primary session panel", () => {
+    const state = createDogfoodSidebarState(CONNECTED_INPUT);
+    const html = renderToStaticMarkup(
+      <DogfoodSessionStatePanel
+        actionResult={null}
+        actionRouteStates={{}}
+        actionSubmitting={null}
+        onRefresh={async () => undefined}
+        onAction={async () => undefined}
+        proposedActions={[]}
+        sidebarState={state}
+        streamConnecting={false}
+        streamRefreshError={null}
+        streamRefreshing={false}
+        streamOpen={false}
+        streamState={createInitialSessionStreamClientState()}
+      />
+    );
+
+    expect(html).not.toContain("Stream log");
   });
 
   it("renders stream refresh errors with safe HTTP metadata", () => {
@@ -229,6 +359,29 @@ describe("dogfood sidebar shell", () => {
     );
 
     expect(html).toContain("Session stream is unavailable from this browser session. HTTP 401.");
+    expect(html).not.toMatch(/Bearer|id_token|access_token|document text|private prompt/i);
+  });
+
+  it("renders stream auth failures as actionable sidebar auth guidance", () => {
+    const state = createDogfoodSidebarState(CONNECTED_INPUT);
+    const html = renderToStaticMarkup(
+      <DogfoodSessionStatePanel
+        actionResult={null}
+        actionRouteStates={{}}
+        actionSubmitting={null}
+        onRefresh={async () => undefined}
+        onAction={async () => undefined}
+        proposedActions={[]}
+        sidebarState={state}
+        streamConnecting={false}
+        streamRefreshError="Session stream auth is unavailable from this browser session. Sign in from the browser extension sidebar, then refresh."
+        streamRefreshing={false}
+        streamOpen={false}
+        streamState={createInitialSessionStreamClientState()}
+      />
+    );
+
+    expect(html).toContain("Sign in from the browser extension sidebar");
     expect(html).not.toMatch(/Bearer|id_token|access_token|document text|private prompt/i);
   });
 

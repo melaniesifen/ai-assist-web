@@ -99,7 +99,8 @@ const DEFAULT_STREAM_STATUS: DogfoodSidebarContractInput["stream"] = "disconnect
 const DEFAULT_PROPOSED_ACTIONS_STATUS: DogfoodSidebarContractInput["proposedActions"] = "none";
 const DEFAULT_APPLY_STATUS: DogfoodSidebarContractInput["apply"] = "blocked";
 const SESSION_STREAM_UNAVAILABLE_MESSAGE = "Session stream is unavailable from this browser session.";
-const SESSION_STREAM_AUTH_UNAVAILABLE_MESSAGE = "Session stream auth is unavailable from this browser session.";
+const SESSION_STREAM_AUTH_UNAVAILABLE_MESSAGE =
+  "Session stream auth is unavailable from this browser session. Sign in from the browser extension sidebar, then refresh.";
 const QUICK_COMMANDS = [
   { kind: "summarize", label: "Summarize this doc", prompt: "Summarize this Google Doc." },
   { kind: "suggest_edits", label: "Suggest edits", prompt: "Suggest edits for this Google Doc." }
@@ -761,6 +762,7 @@ export function DogfoodAssistantSurface({
     Boolean(sidebarState.activeDocumentId);
   const shouldAutoEnsureContextConsent =
     canEnsureContextConsent && contextConsentResult?.status !== "granted" && contextConsentResult?.status !== "dependency_error";
+  const shouldAutoOpenStream = canAutoOpenDogfoodSessionStream(sidebarState, commandResult);
 
   useEffect(() => {
     latestStreamState.current = dogfoodStreamState;
@@ -780,7 +782,7 @@ export function DogfoodAssistantSurface({
   }, [contextConsenting, shouldAutoEnsureContextConsent, sidebarState.activeDocumentId]);
 
   useEffect(() => {
-    if (!sidebarState.canOpenStream) {
+    if (!shouldAutoOpenStream) {
       streamAbortController.current?.abort();
       streamAbortController.current = null;
       setStreamConnecting(false);
@@ -802,7 +804,7 @@ export function DogfoodAssistantSurface({
       setStreamRefreshing(false);
       setStreamOpen(false);
     };
-  }, [authProvider, sidebarState.canOpenStream, streamRouteFetcher]);
+  }, [authProvider, shouldAutoOpenStream, streamRouteFetcher]);
 
   async function submitCommand(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
@@ -1064,21 +1066,6 @@ export function DogfoodAssistantSurface({
         </section>
       ) : null}
 
-      {contextConsentResult ? (
-        <section className="assistant-status-grid" aria-label="Context consent result">
-          <StatusPanel
-            label="Context consent"
-            status={contextConsentResult.status === "granted" ? "ready" : "blocked"}
-            detail={contextConsentResult.message}
-          />
-          <StatusPanel
-            label="Consent log"
-            status="metadata only"
-            detail={safeDogfoodContextConsentLogExcludesForbiddenContent(contextConsentResult.safeLogEvent) ? "No raw document, prompt, token, provider, or action payload content." : "Blocked by unsafe metadata."}
-          />
-        </section>
-      ) : null}
-
       <DogfoodSessionStatePanel
         actionResult={actionResult}
         actionSubmitting={actionSubmitting}
@@ -1150,8 +1137,52 @@ export function DogfoodAssistantSurface({
           ))}
         </section>
       ) : null}
+
+      <DogfoodContextConsentDebugPanel result={contextConsentResult} streamState={dogfoodStreamState} />
     </section>
   );
+}
+
+export function DogfoodContextConsentDebugPanel({
+  result,
+  streamState
+}: {
+  result: DogfoodContextConsentResult | null;
+  streamState: SessionStreamClientState;
+}): ReactElement {
+  return (
+    <details className="dogfood-debug-panel">
+      <summary>Debug</summary>
+      <section className="assistant-status-grid" aria-label="Debug details">
+        {result ? (
+          <>
+            <StatusPanel
+              label="Context consent"
+              status={result.status === "granted" ? "ready" : "blocked"}
+              detail={result.message}
+            />
+            <StatusPanel
+              label="Consent log"
+              status="metadata only"
+              detail={safeDogfoodContextConsentLogExcludesForbiddenContent(result.safeLogEvent) ? "No raw document, prompt, token, provider, or action payload content." : "Blocked by unsafe metadata."}
+            />
+          </>
+        ) : null}
+        <StatusPanel
+          label="Stream log"
+          status={safeSessionStreamLogExcludesForbiddenContent(streamState.safeLogEvent) ? "metadata only" : "blocked"}
+          detail="No prompt, document, model-output body, token, provider key, or action payload is recorded in the stream log event."
+        />
+      </section>
+    </details>
+  );
+}
+
+export function canAutoOpenDogfoodSessionStream(
+  sidebarState: DogfoodSidebarState,
+  commandResult: DogfoodCommandResult | null
+): boolean {
+  return sidebarState.canOpenStream && commandResult?.status === "accepted";
 }
 
 export function DogfoodSessionStatePanel({
@@ -1198,18 +1229,16 @@ export function DogfoodSessionStatePanel({
             ))}
           </ul>
         ) : null}
-        <div className="message-list">
-          {streamState.session.messages.length === 0 ? (
-            <p className="empty-state">Ask a question about this Google Doc.</p>
-          ) : (
-            streamState.session.messages.map((message) => (
+        {streamState.session.messages.length > 0 ? (
+          <div className="message-list">
+            {streamState.session.messages.map((message) => (
               <p className={`message ${message.role}`} key={message.messageId}>
                 <span>{message.status === "FINAL" ? "Final" : "Streaming"}</span>
                 {message.content}
               </p>
-            ))
-          )}
-        </div>
+            ))}
+          </div>
+        ) : null}
         {streamState.reconnectRequired ? (
           <p className="stream-warning" role="status">
             Refresh durable session state before applying changes.
@@ -1246,11 +1275,6 @@ export function DogfoodSessionStatePanel({
         {actionResult ? <DogfoodActionResultPanel result={actionResult} /> : null}
       </article>
 
-      <article className="assistant-status-panel">
-        <span>Stream log</span>
-        <strong>{safeSessionStreamLogExcludesForbiddenContent(streamState.safeLogEvent) ? "metadata only" : "blocked"}</strong>
-        <p>No prompt, document, model-output body, token, provider key, or action payload is recorded in the stream log event.</p>
-      </article>
     </section>
   );
 }
@@ -1807,8 +1831,13 @@ function createAuthorizedStreamFetcher(
 }
 
 async function resolveStreamAuthorization(authProvider: DogfoodCommandAuthProvider): Promise<string> {
-  const authorization = await authProvider();
-  if (!authorization.startsWith("Bearer ")) {
+  let authorization: string;
+  try {
+    authorization = await authProvider();
+  } catch {
+    throw new Error(SESSION_STREAM_AUTH_UNAVAILABLE_MESSAGE);
+  }
+  if (typeof authorization !== "string" || !authorization.startsWith("Bearer ")) {
     throw new Error(SESSION_STREAM_AUTH_UNAVAILABLE_MESSAGE);
   }
   return authorization;

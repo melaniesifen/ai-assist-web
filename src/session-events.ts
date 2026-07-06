@@ -187,6 +187,7 @@ export function reduceSessionEvent(state: SessionState | undefined, event: Sessi
       break;
     case SESSION_EVENT_TYPES.ASSISTANT_FINAL:
       finalizeAssistantMessage(next, normalizedEvent);
+      next.progress = [];
       break;
     case SESSION_EVENT_TYPES.ACTION_PROPOSED:
       if (normalizedEvent.action?.actionId) {

@@ -17,7 +17,7 @@ describe("session stream client helpers", () => {
   it("reduces mocked SSE frames with full SessionEvent envelopes", () => {
     const state = createSessionStreamDemoFrames().reduce(reduceSseFrame, createInitialSessionStreamClientState());
 
-    expect(state.session.progress[0].message).toBe("Loading approved context");
+    expect(state.session.progress).toEqual([]);
     expect(state.session.messages).toEqual([
       { messageId: "assistant-stream", role: "assistant", content: "Here is a streamed answer.", status: "FINAL" }
     ]);
@@ -124,7 +124,7 @@ describe("session stream client helpers", () => {
     expect(stateUpdates).toContain("evt-route-1:1:");
     expect(stateUpdates).toContain("evt-route-2:1:Draft ");
     expect(stateUpdates).toContain("evt-route-4:1:Draft ready.");
-    expect(result.state.session.progress.map((progress) => progress.message)).toEqual(["Loading context"]);
+    expect(result.state.session.progress).toEqual([]);
     expect(result.state.session.messages).toEqual([
       { messageId: "msg-route", role: "assistant", content: "Draft ready.", status: "FINAL" }
     ]);

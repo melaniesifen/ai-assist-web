@@ -174,10 +174,29 @@ code {
 .assistant-status-panel,
 .blocker-list,
 .assistant-ready-note,
+.dogfood-debug-panel,
 .dev-harness-panel {
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--paper);
+}
+
+.dogfood-debug-panel {
+  margin: 0 12px 12px;
+}
+
+.dogfood-debug-panel summary {
+  cursor: pointer;
+  padding: 10px 12px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.dogfood-debug-panel .assistant-status-grid {
+  border-top: 1px solid var(--line);
+  padding: 12px;
 }
 
 .readiness-control {

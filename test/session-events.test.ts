@@ -24,6 +24,10 @@ describe("session event reducer", () => {
   it("reduces assistant deltas and final events into a single message", () => {
     let state = createInitialSessionState();
     state = reduceSessionEvent(state, {
+      eventId: "evt-progress",
+      type: "progress"
+    });
+    state = reduceSessionEvent(state, {
       eventId: "evt-1",
       type: "assistant.delta",
       messageId: "msg-1",
@@ -44,6 +48,7 @@ describe("session event reducer", () => {
     expect(state.messages).toEqual([
       { messageId: "msg-1", role: "assistant", content: "Hello there", status: "FINAL" }
     ]);
+    expect(state.progress).toEqual([]);
   });
 
   it("deduplicates session events by eventId", () => {
@@ -279,11 +284,7 @@ describe("session event reducer", () => {
       payload: { messageId: "msg-1", content: "Streaming answer" }
     });
 
-    expect(state.progress[0]).toEqual({
-      eventId: "evt-1",
-      message: "Loading approved context",
-      createdAt: "2026-06-07T12:00:00.000Z"
-    });
+    expect(state.progress).toEqual([]);
     expect(state.messages).toEqual([
       { messageId: "msg-1", role: "assistant", content: "Streaming answer", status: "FINAL" }
     ]);
